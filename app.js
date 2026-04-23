@@ -1,36 +1,42 @@
 import { fullInventory } from './data.js?v=2';
-
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { 
-    getFirestore, 
-    collection, 
-    getDocs, 
+import {
+    getFirestore,
+    collection,
+    getDocs,
     onSnapshot,
-    doc, 
-    setDoc, 
-    updateDoc, 
-    writeBatch 
+    doc,
+    setDoc,
+    updateDoc,
+    writeBatch
 } from "firebase/firestore";
 
-// Firebase configuration
+// Firebase configuration for 5ta Brigada
 const firebaseConfig = {
-  apiKey: "AIzaSyBpGkDT1Fz-XqY_H7clwtHYiwyeCsWvrQk",
-  authDomain: "inventario-5ta-brigada.firebaseapp.com",
-  projectId: "inventario-5ta-brigada",
-  storageBucket: "inventario-5ta-brigada.firebasestorage.app",
-  messagingSenderId: "903523003246",
-  appId: "1:903523003246:web:bd4cbd336d7f01ac46ef7f",
-  measurementId: "G-LFWZTZFGRR"
+    apiKey: "AIzaSyBpGkDT1Fz-XqY_H7clwtHYiwyeCsWvrQk",
+    authDomain: "inventario-5ta-brigada.firebaseapp.com",
+    projectId: "inventario-5ta-brigada",
+    storageBucket: "inventario-5ta-brigada.firebasestorage.app",
+    messagingSenderId: "903523003246",
+    appId: "1:903523003246:web:bd4cbd336d7f01ac46ef7f",
+    measurementId: "G-LFWZTZFGRR"
 };
 
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+let analytics;
+try {
+    analytics = getAnalytics(app);
+} catch (e) {
+    console.warn("Analytics blocked or failed to load");
+}
 const db = getFirestore(app);
 
 const IMGBB_API_KEY = "6f61e5ee8f8afa155a55c439b13602e5";
 
 let reviewedCount = 0;
+let currentUnit = "5ta Brigada";
+let currentCollection = "inventory";
 
 document.addEventListener('DOMContentLoaded', async () => {
     const tableBody = document.getElementById('inventory-body');
@@ -45,65 +51,91 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Cargando inventario desde Firebase...</td></tr>';
 
-    // Real-time listener
-    onSnapshot(collection(db, "inventory"), (snapshot) => {
-        if (snapshot.empty) {
-            console.log("Database is empty. Populating...");
-            tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Inicializando base de datos por primera vez...</td></tr>';
-            // One-time populate if empty
-            const batch = writeBatch(db);
-            fullInventory.forEach((item) => {
-                const docRef = doc(db, "inventory", item.codigo);
-                batch.set(docRef, { ...item, estado: "", revisado: false, comentarios: "", fotoUrl: "" });
+    let inventariador = localStorage.getItem('inventariador') || '';
+    if (!inventariador) {
+        inventariador = prompt('Por favor, ingresa tu nombre antes de continuar:') || 'Bombero';
+        localStorage.setItem('inventariador', inventariador);
+    }
+
+    let unsubscribe = null;
+
+    function startRealtimeListener() {
+        if (unsubscribe) unsubscribe();
+
+        tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Conectando con la base de datos...</td></tr>';
+
+        unsubscribe = onSnapshot(collection(db, currentCollection), (snapshot) => {
+            if (snapshot.empty) {
+                console.log(`Database ${currentCollection} is empty. Populating...`);
+                tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Inicializando base de datos por primera vez...</td></tr>';
+                const batch = writeBatch(db);
+                fullInventory.forEach((item) => {
+                    const docRef = doc(db, currentCollection, item.codigo);
+                    batch.set(docRef, { ...item, estado: "", revisado: false, comentarios: "", fotoUrl: "" });
+                });
+                batch.commit();
+                return;
+            }
+
+            currentInventoryData = [];
+            let hasExpired = false;
+            const todayStr = new Date().toISOString().split('T')[0];
+            const batchUpdate = writeBatch(db);
+
+            snapshot.forEach((docSnap) => {
+                const item = { id: docSnap.id, ...docSnap.data() };
+
+                if (item.revisado && item.proximaRevision && item.proximaRevision.trim() !== '' && item.proximaRevision < todayStr) {
+                    item.revisado = false;
+                    batchUpdate.update(doc(db, currentCollection, item.id), { revisado: false, ultimaRevision: "" });
+                    hasExpired = true;
+                }
+
+                currentInventoryData.push(item);
             });
-            batch.commit();
-            return;
-        }
 
-        currentInventoryData = [];
-        snapshot.forEach((docSnap) => {
-            currentInventoryData.push({ id: docSnap.id, ...docSnap.data() });
-        });
+            if (hasExpired) {
+                batchUpdate.commit().catch(e => console.error("Error auto-unchecking:", e));
+            }
 
-        // Sort data by codigo to keep numbering stable
-        currentInventoryData.sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, {numeric: true, sensitivity: 'base'}));
+            currentInventoryData.sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true, sensitivity: 'base' }));
 
-        totalItemsEl.textContent = currentInventoryData.length;
-        reviewedCount = currentInventoryData.filter(item => item.revisado).length;
-        reviewedItemsEl.textContent = reviewedCount;
-        
-        // Apply current filter
-        const filter = searchInput.value.toLowerCase();
-        const filteredData = currentInventoryData.filter(item => 
-            (item.descripcion || '').toLowerCase().includes(filter) ||
-            (item.codigo || '').toLowerCase().includes(filter)
-        );
+            totalItemsEl.textContent = currentInventoryData.length;
+            reviewedCount = currentInventoryData.filter(item => item.revisado).length;
+            reviewedItemsEl.textContent = reviewedCount;
 
-        // Save current focus to restore it later
-        const activeElementId = document.activeElement ? document.activeElement.id : null;
-        const cursorPosition = document.activeElement ? document.activeElement.selectionStart : null;
+            const filter = searchInput.value.toLowerCase();
+            const filteredData = currentInventoryData.filter(item =>
+                (item.descripcion || '').toLowerCase().includes(filter) ||
+                (item.codigo || '').toLowerCase().includes(filter)
+            );
 
-        renderTable(filteredData, tableBody, totalItemsEl, reviewedItemsEl, modal, modalImg);
+            const activeElementId = document.activeElement ? document.activeElement.id : null;
+            const cursorPosition = document.activeElement ? document.activeElement.selectionStart : null;
 
-        // Restore focus if it was a comment or status
-        if (activeElementId) {
-            const el = document.getElementById(activeElementId);
-            if (el) {
-                el.focus();
-                if (cursorPosition !== null && typeof el.setSelectionRange === 'function') {
-                    el.setSelectionRange(cursorPosition, cursorPosition);
+            renderTable(filteredData, tableBody, totalItemsEl, reviewedItemsEl, modal, modalImg);
+
+            if (activeElementId) {
+                const el = document.getElementById(activeElementId);
+                if (el) {
+                    el.focus();
+                    if (cursorPosition !== null && typeof el.setSelectionRange === 'function') {
+                        el.setSelectionRange(cursorPosition, cursorPosition);
+                    }
                 }
             }
-        }
-    }, (error) => {
-        console.error("Snapshot error:", error);
-        tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center; color: red;">Error en tiempo real. Revisa la consola.</td></tr>';
-    });
+        }, (error) => {
+            console.error("Snapshot error:", error);
+            tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center; color: red;">Error en tiempo real. Revisa la consola.</td></tr>';
+        });
+    }
+
+    startRealtimeListener();
 
     // Search input listener
     searchInput.addEventListener('input', () => {
         const filter = searchInput.value.toLowerCase();
-        const filteredData = currentInventoryData.filter(item => 
+        const filteredData = currentInventoryData.filter(item =>
             (item.descripcion || '').toLowerCase().includes(filter) ||
             (item.codigo || '').toLowerCase().includes(filter)
         );
@@ -117,7 +149,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const tr = document.createElement('tr');
             tr.id = `row-${item.id}`;
             if (item.revisado) tr.classList.add('completed');
-
 
             tr.innerHTML = `
                 <td data-label="#" style="text-align: center; font-weight: bold; color: var(--accent);">${index + 1}</td>
@@ -135,7 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td data-label="Modelo">${item.modelo || ''}</td>
                 <td data-label="Serie">${item.serie || ''}</td>
                 <td data-label="Estado">
-                    <select class="status-select default" id="status-${item.id}">
+                    <select class="status-select default" id="status-${item.id}" ${item.revisado ? 'disabled' : ''}>
                         <option value="" disabled ${!item.estado ? 'selected' : ''}>Seleccionar...</option>
                         <option value="bueno" ${item.estado === 'bueno' ? 'selected' : ''}>Bueno</option>
                         <option value="malo" ${item.estado === 'malo' ? 'selected' : ''}>Malo</option>
@@ -143,19 +174,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <option value="no-existe" ${item.estado === 'no-existe' ? 'selected' : ''}>No existe</option>
                     </select>
                 </td>
-                <td data-label="Última Rev.">${item.ultimaRevision || '-'}</td>
-                <td data-label="Próxima Rev.">${item.proximaRevision || '-'}</td>
+                <td data-label="Fecha de Revisión">${item.ultimaRevision || '-'}</td>
                 <td data-label="Revisión" class="action-column">
                     <div class="checkbox-wrapper">
                         <input type="checkbox" class="custom-checkbox" id="check-${item.id}" ${item.revisado ? 'checked' : ''}>
                     </div>
                 </td>
+                <td data-label="Próxima Rev.">
+                    <input type="date" class="comment-input date-input-inline" id="next-rev-${item.id}" value="${item.proximaRevision || ''}" style="padding: 4px; font-size: 0.85rem; width: 130px;" ${item.revisado ? 'disabled' : ''} max="9999-12-31">
+                </td>
                 <td data-label="Comentarios" class="action-column">
-                    <textarea class="comment-input" id="comment-${item.id}" rows="1" placeholder="Agregar comentario...">${item.comentarios || ''}</textarea>
+                    <textarea class="comment-input" id="comment-${item.id}" rows="1" placeholder="Agregar comentario..." ${item.revisado ? 'disabled' : ''}>${item.comentarios || ''}</textarea>
                 </td>
                 <td data-label="Acciones" class="action-column" style="display:flex; gap:15px; align-items:center; justify-content:center; padding-top:10px;">
-                    <button class="icon-btn edit-item-btn" id="edit-${item.id}" title="Editar Item" style="color: #3b82f6; background: none; border: none; cursor: pointer; font-size: 22px;"><i class="ph ph-pencil-simple"></i></button>
-                    <button class="icon-btn delete-item-btn" id="delete-item-${item.id}" title="Borrar Item" style="color: #ef4444; background: none; border: none; cursor: pointer; font-size: 22px;"><i class="ph ph-trash"></i></button>
+                    <button class="icon-btn edit-item-btn" id="edit-${item.id}" title="Editar Item" style="color: ${item.revisado ? '#9ca3af' : '#3b82f6'}; background: none; border: none; cursor: ${item.revisado ? 'not-allowed' : 'pointer'}; font-size: 22px;" ${item.revisado ? 'disabled' : ''}><i class="ph ph-pencil-simple"></i></button>
+                    <button class="icon-btn delete-item-btn" id="delete-item-${item.id}" title="Borrar Item" style="color: ${item.revisado ? '#9ca3af' : '#ef4444'}; background: none; border: none; cursor: ${item.revisado ? 'not-allowed' : 'pointer'}; font-size: 22px;" ${item.revisado ? 'disabled' : ''}><i class="ph ph-trash"></i></button>
                 </td>
             `;
 
@@ -194,20 +227,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             checkbox.addEventListener('change', async (e) => {
                 const isChecked = e.target.checked;
                 const updateData = { revisado: isChecked };
-                
-                if (isChecked) { 
-                    tr.classList.add('completed'); 
-                    reviewedCount++; 
-                    // Set current date as Last Review if not already set or whenever checked
+
+                if (isChecked) {
+                    tr.classList.add('completed');
+                    reviewedCount++;
                     const today = new Date().toISOString().split('T')[0];
-                    updateData.ultimaRevision = today;
-                } else { 
-                    tr.classList.remove('completed'); 
-                    reviewedCount--; 
+                    updateData.ultimaRevision = `${today} por ${inventariador}`;
+                } else {
+                    tr.classList.remove('completed');
+                    reviewedCount--;
+                    updateData.ultimaRevision = "";
                 }
-                
+
                 reviewedItemsEl.textContent = reviewedCount;
-                await updateDoc(doc(db, "inventory", item.id), updateData);
+                await updateDoc(doc(db, currentCollection, item.id), updateData);
             });
 
             // Comment
@@ -218,7 +251,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 e.target.style.height = (e.target.scrollHeight) + 'px';
                 clearTimeout(timeoutId);
                 timeoutId = setTimeout(async () => {
-                    await updateDoc(doc(db, "inventory", item.id), { comentarios: e.target.value });
+                    await updateDoc(doc(db, currentCollection, item.id), { comentarios: e.target.value });
                 }, 1000);
             });
 
@@ -234,7 +267,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (item.estado) updateSelectColor(item.estado);
             statusSelect.addEventListener('change', async (e) => {
                 updateSelectColor(e.target.value);
-                await updateDoc(doc(db, "inventory", item.id), { estado: e.target.value });
+                await updateDoc(doc(db, currentCollection, item.id), { estado: e.target.value });
+            });
+
+            // Inline Proxima Revision
+            const nextRevInput = tr.querySelector(`#next-rev-${item.id}`);
+            nextRevInput.addEventListener('input', (e) => {
+                const val = e.target.value;
+                if (val) {
+                    const parts = val.split('-');
+                    if (parts[0] && parts[0].length > 4) {
+                        parts[0] = parts[0].substring(0, 4);
+                        e.target.value = parts.join('-');
+                    }
+                }
+            });
+            nextRevInput.addEventListener('blur', async (e) => {
+                if (item.proximaRevision !== e.target.value) {
+                    await updateDoc(doc(db, currentCollection, item.id), { proximaRevision: e.target.value });
+                }
             });
 
             // Delete Item
@@ -244,7 +295,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (!confirm(`¿Estás seguro de ELIMINAR el ítem ${item.codigo}? Esta acción no se puede deshacer.`)) return;
                     try {
                         const batch = writeBatch(db);
-                        batch.delete(doc(db, "inventory", item.id));
+                        batch.delete(doc(db, currentCollection, item.id));
                         await batch.commit();
                         tr.remove();
                         photoTr.remove();
@@ -290,7 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (!confirm('¿Estás seguro de borrar esta foto?')) return;
                     deletePhotoBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Borrando...';
                     try {
-                        await updateDoc(doc(db, "inventory", item.id), { fotoUrl: "" });
+                        await updateDoc(doc(db, currentCollection, item.id), { fotoUrl: "" });
                         previewThumb.src = "";
                         previewThumb.classList.remove('visible');
                         deletePhotoBtn.classList.add('hidden');
@@ -318,7 +369,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         previewThumb.src = imageUrl;
                         previewThumb.classList.add('visible');
                         deletePhotoBtn.classList.remove('hidden');
-                        await updateDoc(doc(db, "inventory", item.id), { fotoUrl: imageUrl });
+                        await updateDoc(doc(db, currentCollection, item.id), { fotoUrl: imageUrl });
                         labelBtn.innerHTML = '<i class="ph ph-check"></i> Subida';
                     } else {
                         throw new Error("ImgBB error");
@@ -351,7 +402,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const batch = writeBatch(db);
             fullInventory.forEach((item) => {
-                const docRef = doc(db, "inventory", item.codigo);
+                const docRef = doc(db, currentCollection, item.codigo);
                 batch.set(docRef, {
                     codigo: item.codigo, sicafi: item.sicafi, pf: item.pf,
                     descripcion: item.descripcion, ubicacion: item.ubicacion,
@@ -377,7 +428,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             clearDbBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Borrando...';
             clearDbBtn.disabled = true;
             try {
-                const snap = await getDocs(collection(db, "inventory"));
+                const snap = await getDocs(collection(db, currentCollection));
                 const batch = writeBatch(db);
                 snap.forEach((docSnap) => batch.delete(docSnap.ref));
                 await batch.commit();
@@ -422,7 +473,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             try {
-                const existingDoc = await getDocs(collection(db, "inventory"));
+                const existingDoc = await getDocs(collection(db, currentCollection));
                 let exists = false;
                 existingDoc.forEach(d => { if (d.id === newItem.codigo) exists = true; });
                 if (exists) {
@@ -431,7 +482,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     submitBtn.disabled = false;
                     return;
                 }
-                await setDoc(doc(db, "inventory", newItem.codigo), newItem);
+                await setDoc(doc(db, currentCollection, newItem.codigo), newItem);
                 alert('Item guardado correctamente. La página se recargará.');
                 window.location.reload();
             } catch (error) {
@@ -459,6 +510,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             submitBtn.disabled = true;
 
             const originalCodigo = document.getElementById('edit-original-codigo').value;
+            const isChecked = document.getElementById('edit-revisado').checked;
             const updatedItem = {
                 sicafi: document.getElementById('edit-sicafi').value.trim(),
                 pf: document.getElementById('edit-pf').value.trim(),
@@ -468,14 +520,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 modelo: document.getElementById('edit-modelo').value.trim(),
                 serie: document.getElementById('edit-serie').value.trim(),
                 estado: document.getElementById('edit-estado').value,
-                ultimaRevision: document.getElementById('edit-ultima-revision').value,
                 proximaRevision: document.getElementById('edit-proxima-revision').value,
-                revisado: document.getElementById('edit-revisado').checked,
+                revisado: isChecked,
                 comentarios: document.getElementById('edit-comentarios').value.trim()
             };
 
+            const currentItem = currentInventoryData.find(i => i.codigo === originalCodigo);
+            if (isChecked && currentItem && !currentItem.revisado) {
+                const today = new Date().toISOString().split('T')[0];
+                updatedItem.ultimaRevision = `${today} por ${inventariador}`;
+            }
+
             try {
-                await updateDoc(doc(db, "inventory", originalCodigo), updatedItem);
+                await updateDoc(doc(db, currentCollection, originalCodigo), updatedItem);
                 alert('Item actualizado correctamente. La página se recargará.');
                 window.location.reload();
             } catch (error) {
@@ -499,7 +556,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const { jsPDF } = window.jspdf;
                 const pdfDoc = new jsPDF({ orientation: 'landscape' });
-                pdfDoc.text("Inventario 5ta Brigada U-30", 14, 15);
+                pdfDoc.text(`Inventario ${currentUnit}`, 14, 15);
                 pdfDoc.setFontSize(10);
 
                 const fetchImageAsBase64 = (url) => {
@@ -536,7 +593,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 };
 
-                const pdfSnap = await getDocs(collection(db, "inventory"));
+                const pdfSnap = await getDocs(collection(db, currentCollection));
                 const pdfData = [];
                 let pdfIdx = 1;
                 for (const docSnap of pdfSnap.docs) {
@@ -568,7 +625,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         10: { cellWidth: 15, halign: 'center' }, 11: { cellWidth: 15, halign: 'center' },
                         12: { cellWidth: 25 }
                     },
-                    didDrawCell: function(data) {
+                    didDrawCell: function (data) {
                         if (data.column.index === 0 && data.cell.section === 'body') {
                             const base64 = data.row.raw[0];
                             if (base64 && base64.startsWith('data:image')) {
@@ -578,7 +635,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             }
                         }
                     },
-                    didParseCell: function(data) {
+                    didParseCell: function (data) {
                         if (data.column.index === 0 && data.cell.section === 'body') data.cell.text = '';
                     }
                 });
@@ -603,7 +660,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             exportExcelBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Generando Excel...';
             try {
-                const excelSnap = await getDocs(collection(db, "inventory"));
+                const excelSnap = await getDocs(collection(db, currentCollection));
                 let excelIdx = 1;
                 const excelData = excelSnap.docs.map(docSnap => {
                     const item = docSnap.data();
@@ -634,6 +691,526 @@ document.addEventListener('DOMContentLoaded', async () => {
             } finally {
                 exportExcelBtn.innerHTML = '<i class="ph ph-file-xls"></i> Excel';
             }
+        });
+    }
+
+    // --- Smart AI Assistant Logic ---
+    const aiInput = document.getElementById('ai-input');
+    const sendAi = document.getElementById('send-ai');
+    const aiMessages = document.getElementById('ai-messages');
+
+    if (aiInput && sendAi && aiMessages) {
+        function addMessage(text, sender, actions = []) {
+            const div = document.createElement('div');
+            div.className = `ai-message ${sender}`;
+            div.innerHTML = text;
+
+            if (actions.length > 0) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;';
+                actions.forEach(action => {
+                    const btn = document.createElement('button');
+                    btn.innerHTML = action.label;
+                    btn.style.cssText = 'background:#6366f1;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:6px;';
+                    btn.addEventListener('click', action.handler);
+                    actionsDiv.appendChild(btn);
+                });
+                div.appendChild(actionsDiv);
+            }
+
+            if (aiMessages.style.maxHeight === '0px' || !aiMessages.style.maxHeight) {
+                aiMessages.style.padding = '1.5rem';
+                aiMessages.style.maxHeight = '500px';
+                aiMessages.style.overflowY = 'auto';
+            }
+            aiMessages.appendChild(div);
+            aiMessages.scrollTop = aiMessages.scrollHeight;
+        }
+
+        // Función para filtrar la tabla en pantalla
+        function filterTableWith(term) {
+            searchInput.value = term;
+            searchInput.dispatchEvent(new Event('input'));
+        }
+
+        // Función para descargar PDF de un conjunto de ítems
+        async function downloadFilteredPDF(items, titulo) {
+            if (typeof window.jspdf === 'undefined') {
+                addMessage("⚠️ La librería de PDF no está disponible.", 'assistant');
+                return;
+            }
+            addMessage(`⏳ Generando PDF de <strong>${items.length}</strong> ítems de "${titulo}"...`, 'assistant');
+            const { jsPDF } = window.jspdf;
+            const pdfDoc = new jsPDF({ orientation: 'landscape' });
+            pdfDoc.text(`Inventario ${currentUnit} — Filtro: "${titulo}"`, 14, 15);
+            pdfDoc.setFontSize(9);
+            const pdfData = items.map((item, idx) => [
+                idx + 1,
+                item.codigo || '', item.sicafi || '', item.pf || '',
+                item.descripcion || '', item.ubicacion || '',
+                item.marca || '', item.modelo || '', item.serie || '',
+                item.estado || '', item.revisado ? 'Sí' : 'No', item.comentarios || ''
+            ]);
+            pdfDoc.autoTable({
+                startY: 20,
+                head: [['#', 'Código', 'SICAFI', 'PF', 'Descripción', 'Ubicación', 'Marca', 'Modelo', 'Serie', 'Estado', 'Revisado', 'Comentarios']],
+                body: pdfData,
+                theme: 'grid',
+                styles: { fontSize: 7.5, valign: 'middle', halign: 'left', overflow: 'linebreak' },
+                headStyles: { fillColor: [99, 102, 241], halign: 'center', fontSize: 7.5, fontStyle: 'bold' }
+            });
+            pdfDoc.save(`inventario_${titulo.replace(/\s+/g, '_')}.pdf`);
+            addMessage(`✅ ¡PDF listo! Se han descargado <strong>${items.length}</strong> ítems de "${titulo}". 📄`, 'assistant');
+        }
+
+        // Función para descargar Excel de un conjunto de ítems
+        function downloadFilteredExcel(items, titulo) {
+            if (typeof XLSX === 'undefined') {
+                addMessage("⚠️ La librería de Excel no está disponible.", 'assistant');
+                return;
+            }
+            const excelData = items.map((item, idx) => ({
+                '#': idx + 1,
+                'Código': item.codigo || '', 'SICAFI': item.sicafi || '', 'PF': item.pf || '',
+                'Descripción': item.descripcion || '', 'Ubicación': item.ubicacion || '',
+                'Marca': item.marca || '', 'Modelo': item.modelo || '', 'Serie': item.serie || '',
+                'Estado': item.estado || '', 'Revisado': item.revisado ? 'Sí' : 'No',
+                'Comentarios': item.comentarios || ''
+            }));
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Filtrado");
+            XLSX.writeFile(workbook, `inventario_${titulo.replace(/\s+/g, '_')}.xlsx`);
+            addMessage(`✅ ¡Excel listo!`, 'assistant');
+        }
+
+        let chatHistory = [];
+        let lastMatchedItems = [];
+        let lastKeywords = [];
+
+        async function processAiQuery(query) {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'ai-message assistant';
+            typingDiv.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+            aiMessages.style.padding = '1.5rem';
+            aiMessages.style.maxHeight = '800px';
+            aiMessages.appendChild(typingDiv);
+            aiMessages.scrollTop = aiMessages.scrollHeight;
+
+            if (!currentInventoryData || currentInventoryData.length === 0) {
+                typingDiv.remove();
+                addMessage("⚠️ Los datos aún no han cargado.", 'assistant');
+                return;
+            }
+
+            // ─── NORMALIZATION ───────────────────────────────────────────────
+            function norm(str) {
+                let s = (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                if (s.endsWith("es") && s.length > 4) s = s.slice(0, -2);
+                else if (s.endsWith("s") && s.length > 3) s = s.slice(0, -1);
+                return s;
+            }
+
+            const qNorm = query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+            // ─── FIREFIGHTER SYNONYM DICTIONARY ──────────────────────────────
+            const SYNONYMS = {
+                'tramo':['tramo'],'tramos':['tramo'],'manguera':['manguera','tramo'],
+                'mangueras':['manguera','tramo'],'linea':['linea','tramo','manguera'],
+                'lineas':['linea','tramo'],'hose':['tramo','manguera'],
+                'piton':['piton'],'pitones':['piton'],'lanza':['piton','lanza'],
+                'boquilla':['piton','boquilla'],'nozzle':['piton'],
+                'pitón':['piton'],'pitónes':['piton'],
+                'reduccion':['reduccion','adaptador'],'adaptador':['adaptador','reduccion'],
+                'siames':['siames'],'bifurcacion':['bifurcacion','siames'],
+                'copl':['copl','acoplamiento'],'acoplamiento':['acoplamiento','copl'],
+                'llave':['llave'],'espanero':['espanero','llave'],
+                'scba':['equipo de respiracion','scba','msa','msn','respiracion'],
+                'aire':['aire','equipo de respiracion','cilindro'],
+                'cilindro':['cilindro','tanque'],'cilindros':['cilindro','tanque'],
+                'tanque':['cilindro','tanque'],'tanques':['cilindro','tanque'],
+                'oxigeno':['oxigeno','aire','cilindro'],'mascarilla':['mascarilla','mascara'],
+                'mascara':['mascarilla','mascara'],'regulador':['regulador'],
+                'arnés':['arnes','arnés'],'arnes':['arnes'],
+                'hacha':['hacha'],'hachas':['hacha'],'destral':['hacha','destral'],
+                'palanca':['palanca','barreta'],'barreta':['barreta','palanca'],
+                'cizalla':['cizalla'],'cizallas':['cizalla'],
+                'excarcelador':['excarcelador','hidraulico'],'hidraulico':['hidraulico'],
+                'pinza':['pinza','cizalla'],'cortador':['cizalla','cortador'],
+                'separador':['separador','hidraulico'],'ram':['ram','hidraulico'],
+                'combi':['combi','hidraulico'],'herramienta':['herramienta','hidraulico'],
+                'escalera':['escalera'],'escaleras':['escalera'],'escala':['escalera'],
+                'escalas':['escalera'],'ladder':['escalera'],
+                'casco':['casco'],'cascos':['casco'],'helmet':['casco'],
+                'guante':['guante'],'guantes':['guante'],'glove':['guante'],
+                'bota':['bota'],'botas':['bota'],'boot':['bota'],
+                'chaqueton':['chaqueton','chaqueta'],'chaqueta':['chaqueton','chaqueta'],
+                'abrigo':['chaqueton'],'pantalon':['pantalon'],'pantalones':['pantalon'],
+                'capucha':['capucha'],'pasamontaña':['capucha','pasamontana'],
+                'ropa':['chaqueton','pantalon'],'uniforme':['chaqueton','pantalon'],
+                'epp':['casco','guante','bota','chaqueton'],
+                'linterna':['linterna','lampara'],'linternas':['linterna','lampara'],
+                'lampara':['lampara','linterna'],'luz':['linterna','lampara','reflector'],
+                'generador':['generador'],'generadores':['generador'],
+                'reflector':['reflector','lampara'],'reflectores':['reflector'],
+                'cable':['cable'],'extension':['cable','extension'],
+                'motosierra':['motosierra','sierra'],'sierra':['motosierra','sierra'],
+                'motobomba':['motobomba','bomba'],'bomba':['motobomba','bomba'],
+                'motor':['motor','motosierra','motobomba'],
+                'extintor':['extintor','extinguidor'],'extintores':['extintor','extinguidor'],
+                'extinguidor':['extintor','extinguidor'],'extinguish':['extintor'],
+                'co2':['co2','extintor'],'pqs':['pqs','extintor'],
+                'cuerda':['cuerda','linea de vida','soga'],'cuerdas':['cuerda','soga'],
+                'soga':['soga','cuerda'],'sogas':['soga','cuerda'],
+                'vida':['linea de vida','cuerda'],'rappel':['cuerda','descensor'],
+                'descensor':['descensor','cuerda'],'ascensor':['ascensor'],
+                'mosqueton':['mosqueton'],'arnes_alt':['arnes'],
+                'botiquin':['botiquin','primeros auxilios','kit'],
+                'camilla':['camilla'],'camillas':['camilla'],
+                'oximetro':['oximetro'],'desfibrilador':['desfibrilador','dea'],
+                'dea':['dea','desfibrilador'],'collar':['collar','inmovilizador'],
+                'inmovilizador':['inmovilizador','collar'],
+                'radio':['radio'],'radios':['radio'],
+                'comunicacion':['radio','comunicacion'],'handie':['radio'],
+                'walkie':['radio'],'driver':['driver','sirena'],
+                'sirena':['sirena','driver'],'bocina':['sirena','bocina'],
+                'kit':['kit','bolsa','maletin'],'bolsa':['bolsa','kit'],
+                'maletin':['maletin','kit'],'cono':['cono'],
+                'triangulo':['triangulo','cono'],'señal':['señal','cono','triangulo'],
+                'chaleco':['chaleco'],'chalecos':['chaleco'],
+                'careta':['careta','mascara','escudo'],'escudo':['escudo','careta'],
+                'visor':['visor','careta'],'foco':['linterna','foco'],
+                'pico':['pico'],'pala':['pala'],'azadon':['azadon','pala','pico'],
+                'soplete':['soplete'],'plasma':['plasma','cortador'],
+            };
+
+            function expandWithSynonyms(word) { return SYNONYMS[word] || [word]; }
+
+            const INTENTS = {
+                download_pdf:   /\bpdf\b|descarg.*pdf|reporte|imprim|export.*pdf|genera.*pdf|baja.*pdf/.test(qNorm),
+                download_excel: /\bexcel\b|\bxls\b|descarg.*excel|export.*excel|genera.*excel/.test(qNorm),
+                show_table:     /\b(muestr|mostr|enseñ|tabla|ver\s+list|ver\s+todo|visualiz|ponm|filtrar|filtr)\b/.test(qNorm),
+                classify:       /clasific|subcategor|subgenero|subtipo|tipo\s+de|tipos\s+de|tipos?\s+hay|cuales?\s+(son|tipo|hay|exist)|agrup|organiz|diferent|distint|variedad|variant|separa|desglos|listado\s+de|que\s+tipos|cuantos\s+tipos/.test(qNorm),
+                analyze:        /analiz|compar|estadistic|resumen|informe|promedio|balance|resum|totale|cuadro/.test(qNorm),
+                affirm:         /^(si[\s,!]|sí|claro|dale|por supuesto|ok|hazlo|adelante|positivo|correcto|exacto|afirmativo|bueno|listo|genera|procede)/.test(qNorm) || qNorm.trim() === 'si' || qNorm.trim() === 'sí',
+                greet:          /^(hola|buenas|saludos|hey|buenos|hi\b|buen dia|buen tarde|buenas noches)/.test(qNorm),
+                status:         /\b(estado|condicion|funciona|malo|bueno|daña|roto|bien|operativ|disponible|sirve|funcional)\b/.test(qNorm),
+                location:       /\b(donde|ubicacion|estan|se encuentra|lugar|sitio|sector|guardado|almacena)\b/.test(qNorm),
+            };
+
+            if (INTENTS.affirm) {
+                const lastAssistantMsg = [...chatHistory].reverse().find(m => m.role === 'assistant');
+                if (lastAssistantMsg && lastAssistantMsg.content.includes("reporte")) {
+                    INTENTS.download_pdf = true;
+                }
+            }
+
+            let cleanQuery = qNorm
+                .replace(/^(dame|digame|dime|muestra|enseña|listame|necesito saber|quiero saber|quiero ver|quiero que me|que me digas|me puedes decir)\s+(los?|las?|un|una|el|la)?\s*/i, '')
+                .replace(/\b(tipos?\s+de|clases?\s+de|tipos?\s+hay\s+de|que\s+tipos?\s+(hay|existen|tienen)?)\s*/gi, '')
+                .replace(/\b(cuantos?\s+(tipos?|clases?|hay)\s+(de|en|con)?)\s*/gi, '')
+                .replace(/\b(cuales?\s+son\s+(los?|las?)?)\s*/gi, '')
+                .replace(/\b(que\s+(tipo|clase|modelo|marca)\s+(de|tienen)?)\s*/gi, '')
+                .trim();
+
+            const stopWordsNorm = new Set([
+                'hola','saludo','si','no','clar','ok','gracia','porfa','favor','please','bueno','bien',
+                'cuant','cuanta','cuanto','cuantos','cuantas','donde','hay','que','como','cual','cuales',
+                'quien','cuando','porque','cuales','existe','existen','tienen','tienes',
+                'tipo','tipos','tip','clase','clases','clas','modelo','modelos','categoria','categorias',
+                'variedad','variedades','version','versiones','marca','marcas','subtipo','subtipos',
+                'de','el','la','lo','le','los','las','un','una','al','del','en','por','para','con','sin',
+                'a','y','o','ni','pero','entre','sobre','bajo','hasta','desde','hacia','segun',
+                'clasific','clasifica','clasifical','agrup','agrupa','grupalo','organiz','analiz','compar',
+                'diferenci','diferencia','mostr','muestr','mostram','muestra','lista','listar','ver','verl',
+                'descarg','descarga','descargal','descargalo','descargala','genera','imprim','hazlo',
+                'dame','dim','pon','quier','quiero','necesit','busco','buscam','busca',
+                'enseñ','visualiz','export','filtr','filtram','separa',
+                'total','cantidad','son','e','me','mi','tu','su','se','te','nos',
+                'este','esta','estos','estas','ese','esa','aquel','aquella',
+                'tengo','tien','tiene','tenemos','tienen','ali','aqui','alla','aca',
+                'nada','todo','toda','todos','todas','sol','algo','alguno','alguna',
+                'favor','porfavor','deme','digame','cuales','puedes','puede','podrias',
+                'hay','haber','habia','seran','son','hay'
+            ]);
+
+            const rawWords = cleanQuery.split(/[\s¿?.,!;:"]+/).filter(w => w.length >= 2 || /^\d+$/.test(w));
+            const baseKeywords = rawWords.map(norm).filter(w => w.length >= 1 && !stopWordsNorm.has(w));
+
+            const keywords = [];
+            const expandedSets = [];
+            baseKeywords.forEach(kw => {
+                const expanded = expandWithSynonyms(kw);
+                expanded.forEach(e => { if (!keywords.includes(e)) keywords.push(e); });
+                expandedSets.push(expanded);
+            });
+
+            function kwMatches(text, kw) {
+                if (/^[\d\/]+$/.test(kw)) {
+                    return new RegExp(`(^|[^\\d\/])${kw.replace(/\//g,'\\/')}([^\\d\/]|$)`).test(text);
+                }
+                return text.includes(kw);
+            }
+
+            let matchedItems = [];
+
+            if (baseKeywords.length > 0) {
+                matchedItems = currentInventoryData.filter(item => {
+                    const desc = norm(item.descripcion);
+                    const cod  = norm(item.codigo);
+                    const loc  = norm(item.ubicacion);
+                    return expandedSets.every(group =>
+                        group.some(kw => kwMatches(desc, kw) || kwMatches(cod, kw) || kwMatches(loc, kw))
+                    );
+                });
+
+                if (matchedItems.length === 0 && baseKeywords.length > 0) {
+                    const firstExpanded = expandWithSynonyms(baseKeywords[0]);
+                    matchedItems = currentInventoryData.filter(item => {
+                        const desc = norm(item.descripcion);
+                        const cod  = norm(item.codigo);
+                        const loc  = norm(item.ubicacion);
+                        return firstExpanded.some(kw => kwMatches(desc, kw) || kwMatches(cod, kw) || kwMatches(loc, kw));
+                    });
+                }
+
+                if (matchedItems.length > 0) {
+                    lastMatchedItems = matchedItems;
+                    lastKeywords = baseKeywords;
+                }
+            }
+
+            const needsContext = matchedItems.length === 0 && lastMatchedItems.length > 0;
+            if (needsContext) {
+                const queryMentionsPrevTopic = lastKeywords.some(kw => qNorm.includes(kw));
+                const isFollowUp = INTENTS.classify || INTENTS.analyze || INTENTS.download_pdf ||
+                    INTENTS.download_excel || INTENTS.show_table || INTENTS.affirm ||
+                    INTENTS.status || INTENTS.location ||
+                    queryMentionsPrevTopic || query.trim().length < 12;
+                if (isFollowUp) {
+                    matchedItems = lastMatchedItems;
+                }
+            }
+
+            const isAnalyticalQuery = INTENTS.classify || INTENTS.analyze;
+            const kwStr      = baseKeywords.length > 0 ? baseKeywords.join(' ') : lastKeywords.join(' ');
+            const filterTerm = kwStr.split(' ')[0] || '';
+            let factsText = "";
+            if (matchedItems.length > 0) {
+                const locs   = [...new Set(matchedItems.map(i => i.ubicacion || 'Sin ubicación'))];
+                const buenos = matchedItems.filter(i => (i.estado || '').toLowerCase().includes('bueno')).length;
+                factsText = `Hay ${matchedItems.length} ítems de "${kwStr}". Ubicaciones: ${locs.join(', ')}. Condición: ${buenos} en buen estado, ${matchedItems.length - buenos} sin especificar.`;
+                if (matchedItems.length <= 20) {
+                    const detalles = matchedItems.map(i =>
+                        `• [${i.codigo}] ${i.descripcion} — Marca: ${i.marca || 'N/A'}, Estado: ${i.estado || 'N/A'}`
+                    ).join('\n');
+                    factsText += `\nDETALLES POR ÍTEM:\n${detalles}`;
+                }
+            }
+
+            function buildLocalResponse(items, intent, kwStr, query) {
+                if (items.length === 0) {
+                    if (intent.greet) {
+                        const cats = [...new Set(currentInventoryData.map(i => (i.descripcion||'').split(' ')[0]))].slice(0,8).join(', ');
+                        return `¡Hola ${inventariador || 'Bombero'}! 👋 Soy el Cerebro Logístico 5ta Brigada.\n\nPuedo ayudarte con:\n  🔍 Búsquedas: "cuántos pitones hay", "busca escaleras"\n  📊 Análisis: "clasifica los tramos", "analiza el inventario"\n  📄 Reportes: "descarga el PDF", "exportar Excel"\n  🗺️ Ubicaciones: "dónde están los cascos"\n\nEquipos disponibles en esta unidad: ${cats}... ¿Qué necesitas? 🚒`;
+                    }
+                    return null;
+                }
+
+                const locs   = [...new Set(items.map(i => i.ubicacion || 'Sin ubicación'))];
+                const buenos = items.filter(i => (i.estado||'').toLowerCase().includes('bueno')).length;
+                const malos  = items.filter(i => (i.estado||'').toLowerCase().includes('malo')).length;
+                const marcas = [...new Set(items.map(i => i.marca || 'N/A'))];
+
+                function normalizeDesc(d) {
+                    return (d || '').toUpperCase().trim()
+                        .replace(/\s+/g, ' ')
+                        .split(' ').map(w => {
+                            if (w.length > 4 && w.endsWith('ES') && !w.endsWith('ISES')) return w.slice(0, -2);
+                            if (w.length > 3 && w.endsWith('S') && !w.endsWith('SS')) return w.slice(0, -1);
+                            return w;
+                        }).join(' ');
+                }
+
+                const byDesc = {};
+                const descLabel = {};
+                items.forEach(i => {
+                    const key = normalizeDesc(i.descripcion);
+                    byDesc[key] = (byDesc[key]||0)+1;
+                    if (!descLabel[key]) descLabel[key] = i.descripcion;
+                });
+                const uniqueTypes = Object.keys(byDesc).length;
+
+                if (intent.classify) {
+                    const byMarca = {};
+                    items.forEach(i => {
+                        const m = i.marca || 'Sin marca';
+                        if (!byMarca[m]) byMarca[m] = [];
+                        byMarca[m].push(normalizeDesc(i.descripcion));
+                    });
+                    let resp = `📊 Clasificación de los ${items.length} ítems de "${kwStr}":\n\n`;
+                    Object.entries(byMarca).forEach(([marca, descs]) => {
+                        const counts = {};
+                        descs.forEach(d => { counts[d] = (counts[d]||0)+1; });
+                        const lines = Object.entries(counts).map(([d,n]) => `  • ${n}x ${d}`).join('\n');
+                        resp += `🔹 Marca ${marca} (${descs.length} unidades):\n${lines}\n\n`;
+                    });
+                    resp += `📍 Todos en: ${locs.join(', ')} ⚙️`;
+                    return resp;
+                }
+
+                if (intent.analyze) {
+                    let resp = `📈 Análisis de "${kwStr}" — ${items.length} ítems totales:\n`;
+                    resp += `  ✅ En buen estado: ${buenos}\n`;
+                    resp += `  ⚠️ Mal estado: ${malos}\n`;
+                    resp += `  ❓ Sin especificar: ${items.length - buenos - malos}\n`;
+                    resp += `  🏷️ Marcas: ${marcas.join(', ')}\n`;
+                    resp += `  📍 Ubicación: ${locs.join(', ')}`;
+                    return resp;
+                }
+
+                if (/donde|ubicacion|estan/.test(query.toLowerCase())) {
+                    return `📍 Los ${items.length} ítems de "${kwStr}" están en: **${locs.join(', ')}**. Marcas presentes: ${marcas.join(', ')}. 🚒`;
+                }
+
+                if (uniqueTypes === 1) {
+                    const [key, count] = Object.entries(byDesc)[0];
+                    return `🚒 Hay **${count} unidades** de ${key}. Ubicación: ${locs.join(', ')}. Marcas: ${marcas.join(', ')}.`;
+                }
+
+                let resp = `🚒 Encontré **${items.length} ítems** de "${kwStr}" en ${locs.join(', ')} — divididos en ${uniqueTypes} subtipos:\n\n`;
+                Object.entries(byDesc)
+                    .sort((a, b) => b[1] - a[1])
+                    .forEach(([key, count]) => {
+                        resp += `  🔹 ${count}x ${key}\n`;
+                    });
+                resp += `\n🏷️ Marcas: ${marcas.join(', ')}. Estado: ${buenos} buenos, ${malos} mal estado, ${items.length-buenos-malos} sin especificar.`;
+                return resp;
+            }
+
+            try {
+                const localResponse = buildLocalResponse(matchedItems, INTENTS, kwStr, query);
+
+                const inventorySummary = `Inventario ${currentUnit}: ${currentInventoryData.length} ítems totales. Inventariador: ${inventariador || 'Bombero'}.`;
+                const dataContext      = factsText || (lastMatchedItems.length > 0
+                    ? `Contexto previo: ${lastMatchedItems.length} ítems de "${lastKeywords.join(' ')}".`
+                    : "Sin contexto de búsqueda activo.");
+                const intentContext    = Object.entries(INTENTS).filter(([,v]) => v).map(([k]) => k).join(', ') || 'conversación general';
+
+                const systemPrompt = `Eres "Cerebro Logístico 5ta Brigada", una IA avanzada de inventario para Bomberos.
+INVENTARIO: ${inventorySummary}
+DATOS ACTUALES: ${dataContext}
+INTENCIÓN DEL USUARIO: ${intentContext}
+
+INSTRUCCIONES ABSOLUTAS:
+1. Si la intención es "classify" o "analyze": Agrupa y analiza los DETALLES POR ÍTEM. Da un resumen inteligente por marca/tipo.
+2. Si la intención incluye "download_pdf" o "download_excel": Confirma que el archivo fue generado automáticamente.
+3. NUNCA muestres los datos en formato crudo. Conviértelos en lenguaje natural analítico.
+4. Tono: IA avanzada, profesional, proactivo. Emojis precisos (🚒⚙️📊).
+5. Responde en español. Conciso pero rico en información.`;
+
+                chatHistory.push({ role: 'user', content: query });
+                if (chatHistory.length > 20) chatHistory.shift();
+
+                let finalText = localResponse;
+                try {
+                    const controller = new AbortController();
+                    const timeoutId  = setTimeout(() => controller.abort(), 8000);
+
+                    const response = await fetch('https://text.pollinations.ai/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            messages: [
+                                { role: 'system', content: systemPrompt },
+                                ...chatHistory
+                            ],
+                            model: 'openai',
+                            private: true
+                        }),
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+
+                    if (response.ok) {
+                        const rawText   = await response.text();
+                        const cloudText = rawText
+                            .replace(/⚠️[\s\S]*?normally\./gi, '')
+                            .replace(/---[\s\S]*?Support Pollinations[\s\S]*$/gi, '')
+                            .replace(/\*\*Support Pollinations[\s\S]*/gi, '')
+                            .replace(/\*\*Ad\*\*[\s\S]*/gi, '')
+                            .replace(/🌸[\s\S]*?pollinations[\s\S]*/gi, '')
+                            .replace(/Powered by Pollinations[\s\S]*/gi, '')
+                            .replace(/\[Support our mission\][\s\S]*/gi, '')
+                            .replace(/pollinations\.ai[\s\S]*/gi, '')
+                            .trim();
+                        if (cloudText && cloudText.length > 20 
+                            && !cloudText.toLowerCase().includes('no tengo información')
+                            && !cloudText.toLowerCase().includes('pollinations')) {
+                            finalText = cloudText;
+                        }
+                    }
+                } catch (_) {
+                    console.log("Cloud AI unavailable — using local intelligence.");
+                }
+
+                if (!finalText) {
+                    finalText = matchedItems.length === 0
+                        ? "🔍 No encontré ítems con ese criterio. Prueba con otro término (ej: 'manguera', 'hacha', 'piton')."
+                        : `📋 ${matchedItems.length} ítems encontrados de "${kwStr}" en ${[...new Set(matchedItems.map(i=>i.ubicacion))].join(', ')}.`;
+                }
+
+                typingDiv.remove();
+                chatHistory.push({ role: 'assistant', content: finalText });
+
+                if (matchedItems.length > 0) {
+                    if (INTENTS.download_pdf) await downloadFilteredPDF(matchedItems, kwStr || 'inventario');
+                    if (INTENTS.download_excel) downloadFilteredExcel(matchedItems, kwStr || 'inventario');
+                    if (INTENTS.show_table) filterTableWith(filterTerm);
+                }
+
+                const actions = matchedItems.length > 0 ? [
+                    { label: '📋 Ver en Tabla', handler: () => filterTableWith(filterTerm) },
+                    { label: '📄 PDF',          handler: () => downloadFilteredPDF(matchedItems, kwStr) },
+                    { label: '📊 Excel',         handler: () => downloadFilteredExcel(matchedItems, kwStr) }
+                ] : [
+                    { label: '🔄 Ver Todo', handler: () => filterTableWith('') }
+                ];
+
+                addMessage(finalText.replace(/\n/g, '<br>'), 'assistant', actions);
+
+            } catch (err) {
+                console.error("AI Error:", err);
+                typingDiv.remove();
+                const msg = factsText
+                    ? `🚨 Núcleo de lenguaje con latencia. Datos recuperados: ${factsText}`
+                    : "🚒 Error de conexión. Intenta con una búsqueda directa.";
+                addMessage(msg, 'assistant');
+            }
+        }
+
+        sendAi.addEventListener('click', () => {
+            const text = aiInput.value.trim();
+            if (!text) return;
+            addMessage(text, 'user');
+            aiInput.value = '';
+
+            const multiPattern = /\s+y\s+(?=(cuant\w*|donde|busca)\s+\w+)/i;
+            const subQueries = text.split(multiPattern).map(s => s.trim()).filter(s => s.length > 3);
+            
+            if (subQueries.length > 1) {
+                (async () => {
+                    for (const sq of subQueries) {
+                        await processAiQuery(sq);
+                    }
+                })();
+            } else {
+                processAiQuery(text);
+            }
+        });
+
+        aiInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendAi.click();
         });
     }
 
