@@ -31,13 +31,42 @@
 </head>
 
 <body>
-    <div class="app-container">
+    <!-- Auth Container -->
+    <div id="auth-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px;">
+        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center;">
+            <img src="logo.jpeg" alt="Logo" style="width: 100px; margin-bottom: 20px; border-radius: 8px;">
+            <h2 style="margin-bottom: 20px;">Acceso al Sistema</h2>
+            
+            <div style="display: flex; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;">
+                <button id="tab-login" style="flex: 1; padding: 10px; border: none; background: none; font-weight: bold; color: var(--accent); border-bottom: 3px solid var(--accent); cursor: pointer;">Iniciar Sesión</button>
+                <button id="tab-register" style="flex: 1; padding: 10px; border: none; background: none; font-weight: bold; color: #64748b; cursor: pointer;">Registrarse</button>
+            </div>
+
+            <form id="login-form" style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="text" id="login-username" placeholder="Usuario o Placa" required style="padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit;">
+                <input type="password" id="login-password" placeholder="Contraseña" required style="padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit;">
+                <button type="submit" style="padding: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="ph ph-sign-in"></i> Ingresar</button>
+            </form>
+
+            <form id="register-form" style="display: none; flex-direction: column; gap: 15px;">
+                <input type="text" id="register-username" placeholder="Usuario o Placa (Ej: 17010)" required style="padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit;">
+                <input type="password" id="register-password" placeholder="Contraseña" required style="padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit;">
+                <button type="submit" style="padding: 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;"><i class="ph ph-user-plus"></i> Solicitar Registro</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="app-container" id="app-container" style="display: none;">
         <header class="header">
             <div class="header-content" style="display: flex; align-items: center; gap: 1.5rem;">
                 <img src="logo.jpeg" alt="Logo Bomberos" style="width: 70px; height: auto; border-radius: 8px;">
                 <div>
                     <h1>INVENTARIO U30</h1>
                     <p>Gestión y revisión de equipos</p>
+                    <div style="margin-top: 5px; display: flex; gap: 10px;">
+                        <button id="logout-btn" style="background: none; border: 1px solid #ef4444; color: #ef4444; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;"><i class="ph ph-sign-out"></i> Salir</button>
+                        <button id="inbox-btn" style="display: none; background: #3b82f6; border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;"><i class="ph ph-tray"></i> Buzón Solicitudes <span id="inbox-badge" style="background: #ef4444; border-radius: 50%; padding: 0 4px; font-size: 0.7rem; margin-left: 4px;">0</span></button>
+                    </div>
                 </div>
             </div>
 
@@ -242,7 +271,17 @@
 
 
 
-    
+    <!-- Inbox Modal -->
+    <div id="inbox-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px; padding: 20px;">
+            <span class="close-inbox-modal" style="float: right; cursor: pointer; font-size: 20px;"><i class="ph ph-x"></i></span>
+            <h2 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="ph ph-tray"></i> Buzón de Solicitudes</h2>
+            <div id="inbox-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto;">
+                <p style="text-align: center; color: #64748b;">No hay solicitudes pendientes.</p>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="/app.js"></script>
 </body>
 

@@ -51,11 +51,209 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Cargando inventario desde Firebase...</td></tr>';
 
-    let inventariador = localStorage.getItem('inventariador') || '';
-    if (!inventariador) {
-        inventariador = prompt('Por favor, ingresa tu nombre antes de continuar:') || 'Bombero';
-        localStorage.setItem('inventariador', inventariador);
+    const authContainer = document.getElementById('auth-container');
+    const appContainer = document.getElementById('app-container');
+    const tabLogin = document.getElementById('tab-login');
+    const tabRegister = document.getElementById('tab-register');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const logoutBtn = document.getElementById('logout-btn');
+    const inboxBtn = document.getElementById('inbox-btn');
+    const inboxModal = document.getElementById('inbox-modal');
+    const closeInboxModal = document.querySelector('.close-inbox-modal');
+    const inboxList = document.getElementById('inbox-list');
+    const inboxBadge = document.getElementById('inbox-badge');
+
+    let currentUserRole = null;
+    let inventariador = '';
+
+    // Auth Tabs
+    tabLogin.addEventListener('click', () => {
+        loginForm.style.display = 'flex';
+        registerForm.style.display = 'none';
+        tabLogin.style.color = 'var(--accent)';
+        tabLogin.style.borderBottom = '3px solid var(--accent)';
+        tabRegister.style.color = '#64748b';
+        tabRegister.style.borderBottom = 'none';
+    });
+    tabRegister.addEventListener('click', () => {
+        registerForm.style.display = 'flex';
+        loginForm.style.display = 'none';
+        tabRegister.style.color = 'var(--accent)';
+        tabRegister.style.borderBottom = '3px solid var(--accent)';
+        tabLogin.style.color = '#64748b';
+        tabLogin.style.borderBottom = 'none';
+    });
+
+    // Check session
+    const checkSession = () => {
+        const session = localStorage.getItem('userSession');
+        if (session) {
+            const userData = JSON.parse(session);
+            inventariador = userData.username;
+            currentUserRole = userData.role;
+            authContainer.style.display = 'none';
+            appContainer.style.display = 'block';
+            
+            if (currentUserRole === 'commander') {
+                inboxBtn.style.display = 'flex';
+                listenForInbox();
+            } else {
+                inboxBtn.style.display = 'none';
+            }
+            startRealtimeListener();
+        } else {
+            authContainer.style.display = 'flex';
+            appContainer.style.display = 'none';
+        }
+    };
+
+    logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('userSession');
+        window.location.reload();
+    });
+
+    // Login
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const user = document.getElementById('login-username').value.trim();
+        const pass = document.getElementById('login-password').value.trim();
+        const submitBtn = loginForm.querySelector('button');
+        submitBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Ingresando...';
+        submitBtn.disabled = true;
+
+        if (user === '17010' && pass === 'Adri135Emi135') {
+            localStorage.setItem('userSession', JSON.stringify({ username: 'Comandante', role: 'commander' }));
+            checkSession();
+        } else {
+            // Check firestore for regular users
+            try {
+                const docSnap = await getDocs(collection(db, 'users'));
+                let found = false;
+                docSnap.forEach(docSnapChild => {
+                    const data = docSnapChild.data();
+                    if (data.username === user && data.password === pass) {
+                        found = true;
+                        if (data.status === 'approved') {
+                            localStorage.setItem('userSession', JSON.stringify({ username: user, role: 'user' }));
+                            checkSession();
+                        } else {
+                            alert("Tu cuenta está pendiente de aprobación por el comandante.");
+                        }
+                    }
+                });
+                if (!found && user === '17010') {
+                    alert("Credenciales de comandante incorrectas.");
+                } else if (!found) {
+                    alert("Credenciales incorrectas.");
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Error al conectar con la base de datos.");
+            }
+        }
+        submitBtn.innerHTML = '<i class="ph ph-sign-in"></i> Ingresar';
+        submitBtn.disabled = false;
+    });
+
+    // Register
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const user = document.getElementById('register-username').value.trim();
+        const pass = document.getElementById('register-password').value.trim();
+        const submitBtn = registerForm.querySelector('button');
+        submitBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Solicitando...';
+        submitBtn.disabled = true;
+
+        if (user === '17010') {
+            alert("No puedes usar este usuario.");
+            submitBtn.innerHTML = '<i class="ph ph-user-plus"></i> Solicitar Registro';
+            submitBtn.disabled = false;
+            return;
+        }
+
+        try {
+            const userRef = doc(db, 'users', user);
+            const userSnap = await getDocs(collection(db, 'users'));
+            let exists = false;
+            userSnap.forEach(d => { if (d.id === user) exists = true; });
+            
+            if (exists) {
+                alert("El usuario ya existe.");
+            } else {
+                await setDoc(userRef, {
+                    username: user,
+                    password: pass,
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                });
+                alert("Registro solicitado. Debes esperar a que el comandante lo apruebe.");
+                tabLogin.click();
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error al registrar.");
+        }
+        submitBtn.innerHTML = '<i class="ph ph-user-plus"></i> Solicitar Registro';
+        submitBtn.disabled = false;
+    });
+
+    // Inbox Logic (for Commander)
+    let inboxUnsubscribe = null;
+    function listenForInbox() {
+        if (inboxUnsubscribe) inboxUnsubscribe();
+        inboxUnsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+            let pendingUsers = [];
+            snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data.status === 'pending') pendingUsers.push({ id: docSnap.id, ...data });
+            });
+            
+            inboxBadge.textContent = pendingUsers.length;
+            inboxList.innerHTML = '';
+            
+            if (pendingUsers.length === 0) {
+                inboxList.innerHTML = '<p style="text-align: center; color: #64748b;">No hay solicitudes pendientes.</p>';
+            } else {
+                pendingUsers.forEach(user => {
+                    const div = document.createElement('div');
+                    div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;';
+                    div.innerHTML = `
+                        <div>
+                            <strong>${user.username}</strong><br>
+                            <span style="font-size: 0.8rem; color: #64748b;">Contraseña: ${user.password}</span>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="approve-btn" data-id="${user.id}" style="background: #10b981; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;"><i class="ph ph-check"></i> Aprobar</button>
+                            <button class="reject-btn" data-id="${user.id}" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;"><i class="ph ph-x"></i> Rechazar</button>
+                        </div>
+                    `;
+                    inboxList.appendChild(div);
+                });
+
+                document.querySelectorAll('.approve-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const id = e.currentTarget.dataset.id;
+                        await updateDoc(doc(db, 'users', id), { status: 'approved' });
+                    });
+                });
+                document.querySelectorAll('.reject-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const id = e.currentTarget.dataset.id;
+                        if(confirm('¿Seguro que deseas rechazar y eliminar a este usuario?')) {
+                            const batch = writeBatch(db);
+                            batch.delete(doc(db, 'users', id));
+                            await batch.commit();
+                        }
+                    });
+                });
+            }
+        });
     }
+
+    if (inboxBtn) inboxBtn.addEventListener('click', () => inboxModal.classList.remove('hidden'));
+    if (closeInboxModal) closeInboxModal.addEventListener('click', () => inboxModal.classList.add('hidden'));
+    if (inboxModal) inboxModal.addEventListener('click', (e) => { if (e.target === inboxModal) inboxModal.classList.add('hidden'); });
 
     let unsubscribe = null;
 
@@ -130,7 +328,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    startRealtimeListener();
+    checkSession();
 
     // Search input listener
     searchInput.addEventListener('input', () => {
@@ -226,6 +424,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             const checkbox = tr.querySelector(`#check-${item.id}`);
             checkbox.addEventListener('change', async (e) => {
                 const isChecked = e.target.checked;
+
+                if (isChecked) {
+                    if (!confirm("¿Estás seguro que quieres marcar este boton como registrado?")) {
+                        e.target.checked = false;
+                        return;
+                    }
+                } else {
+                    const pass = prompt("Para desmarcar, introduce la contraseña del comandante:");
+                    if (pass !== "Adri135Emi135") {
+                        e.target.checked = true;
+                        if (pass !== null) alert("Contraseña incorrecta.");
+                        return;
+                    }
+                }
+
                 const updateData = { revisado: isChecked };
 
                 if (isChecked) {
