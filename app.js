@@ -1,4 +1,4 @@
-import { fullInventory } from './data.js?v=4';
+import { inventoryU8, inventoryT8 } from './data.js?v=5';
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import {
@@ -494,7 +494,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log(`Database ${currentCollection} is empty. Populating...`);
                 if (typeof tableBody !== 'undefined') tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Inicializando base de datos por primera vez...</td></tr>';
                 const batch = writeBatch(db);
-                fullInventory.forEach((item) => {
+                const dataToUpload = currentUnit === 'U-8' ? inventoryU8 : inventoryT8;
+                dataToUpload.forEach((item) => {
                     const docRef = doc(db, currentCollection, item.codigo);
                     batch.set(docRef, { ...item, estado: "", revisado: false, comentarios: "", fotoUrl: "" });
                 });
