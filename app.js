@@ -106,11 +106,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 if (currentUserRole === 'commander') {
                     if (inboxBtn) inboxBtn.style.display = 'flex';
-                    if (document.getElementById('create-user-btn')) document.getElementById('create-user-btn').style.display = 'flex';
+                    if (document.getElementById('manage-users-btn')) document.getElementById('manage-users-btn').style.display = 'flex';
                     listenForInbox();
+                    if(typeof listenForUsersList === 'function') listenForUsersList();
                 } else {
                     if (inboxBtn) inboxBtn.style.display = 'none';
-                    if (document.getElementById('create-user-btn')) document.getElementById('create-user-btn').style.display = 'none';
+                    if (document.getElementById('manage-users-btn')) document.getElementById('manage-users-btn').style.display = 'none';
                 }
                 startRealtimeListener();
             } catch (e) {
@@ -271,14 +272,67 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    const createUserBtn = document.getElementById('create-user-btn');
-    const createUserModal = document.getElementById('create-user-modal');
-    const closeCreateUserModal = document.querySelector('.close-create-user-modal');
+    const manageUsersBtn = document.getElementById('manage-users-btn');
+    const manageUsersModal = document.getElementById('manage-users-modal');
+    const closeManageUsersModal = document.querySelector('.close-manage-users-modal');
     const commanderRegisterForm = document.getElementById('commander-register-form');
+    const approvedUsersList = document.getElementById('approved-users-list');
 
-    if (createUserBtn) createUserBtn.addEventListener('click', () => createUserModal.classList.remove('hidden'));
-    if (closeCreateUserModal) closeCreateUserModal.addEventListener('click', () => createUserModal.classList.add('hidden'));
-    if (createUserModal) createUserModal.addEventListener('click', (e) => { if (e.target === createUserModal) createUserModal.classList.add('hidden'); });
+    let usersListUnsubscribe = null;
+    window.listenForUsersList = function() {
+        if (usersListUnsubscribe) usersListUnsubscribe();
+        usersListUnsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+            let approvedUsers = [];
+            snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data.status === 'approved') approvedUsers.push({ id: docSnap.id, ...data });
+            });
+            
+            if (approvedUsersList) {
+                approvedUsersList.innerHTML = '';
+                if (approvedUsers.length === 0) {
+                    approvedUsersList.innerHTML = '<p style="text-align: center; color: #64748b;">No hay usuarios aprobados.</p>';
+                } else {
+                    approvedUsers.forEach(user => {
+                        const div = document.createElement('div');
+                        div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;';
+                        div.innerHTML = `
+                            <div class="user-item-wrapper" style="display: flex; width: 100%; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${user.username}</strong><br>
+                                    <span style="font-size: 0.8rem; color: #64748b;">Contraseña: ${user.password}</span>
+                                </div>
+                                <div>
+                                    <button class="delete-user-btn" data-id="${user.id}" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;" title="Eliminar Usuario"><i class="ph ph-trash"></i></button>
+                                </div>
+                            </div>
+                        `;
+                        approvedUsersList.appendChild(div);
+                    });
+
+                    document.querySelectorAll('.delete-user-btn').forEach(btn => {
+                        btn.addEventListener('click', async (e) => {
+                            const id = e.currentTarget.dataset.id;
+                            if(confirm(`¿Seguro que deseas eliminar permanentemente al usuario ${id}?`)) {
+                                try {
+                                    const batch = writeBatch(db);
+                                    batch.delete(doc(db, 'users', id));
+                                    await batch.commit();
+                                } catch (err) {
+                                    console.error(err);
+                                    alert("Error al eliminar usuario.");
+                                }
+                            }
+                        });
+                    });
+                }
+            }
+        });
+    }
+
+    if (manageUsersBtn) manageUsersBtn.addEventListener('click', () => manageUsersModal.classList.remove('hidden'));
+    if (closeManageUsersModal) closeManageUsersModal.addEventListener('click', () => manageUsersModal.classList.add('hidden'));
+    if (manageUsersModal) manageUsersModal.addEventListener('click', (e) => { if (e.target === manageUsersModal) manageUsersModal.classList.add('hidden'); });
 
     if (commanderRegisterForm) {
         commanderRegisterForm.addEventListener('submit', async (e) => {
@@ -306,7 +360,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                     alert("Usuario común creado y aprobado exitosamente.");
                     commanderRegisterForm.reset();
-                    createUserModal.classList.add('hidden');
                 }
             } catch (error) {
                 console.error(error);

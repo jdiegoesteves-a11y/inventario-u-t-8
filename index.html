@@ -66,7 +66,7 @@
                     <div style="margin-top: 5px; display: flex; gap: 10px;">
                         <button id="logout-btn" style="background: none; border: 1px solid #ef4444; color: #ef4444; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;"><i class="ph ph-sign-out"></i> Salir</button>
                         <button id="inbox-btn" style="display: none; background: #3b82f6; border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;"><i class="ph ph-tray"></i> Buzón Solicitudes <span id="inbox-badge" style="background: #ef4444; border-radius: 50%; padding: 0 4px; font-size: 0.7rem; margin-left: 4px;">0</span></button>
-                        <button id="create-user-btn" style="display: none; background: #10b981; border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;"><i class="ph ph-user-plus"></i> Crear Usuario</button>
+                        <button id="manage-users-btn" style="display: none; background: #10b981; border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;"><i class="ph ph-users"></i> Administrar Usuarios</button>
                     </div>
                 </div>
             </div>
@@ -284,12 +284,19 @@
         </div>
     </div>
 
-    <!-- Create User Modal (Commander Only) -->
-    <div id="create-user-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 400px; padding: 20px;">
-            <span class="close-create-user-modal" style="float: right; cursor: pointer; font-size: 20px;"><i class="ph ph-x"></i></span>
-            <h2 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="ph ph-user-plus"></i> Registrar Usuario Común</h2>
-            <form id="commander-register-form" style="display: flex; flex-direction: column; gap: 15px;">
+    <!-- Manage Users Modal (Commander Only) -->
+    <div id="manage-users-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px; padding: 20px;">
+            <span class="close-manage-users-modal" style="float: right; cursor: pointer; font-size: 20px;"><i class="ph ph-x"></i></span>
+            
+            <h2 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="ph ph-users"></i> Administrar Usuarios</h2>
+            
+            <div id="approved-users-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px;">
+                <p style="text-align: center; color: #64748b;">Cargando usuarios...</p>
+            </div>
+
+            <h3 style="margin-bottom: 10px; display: flex; align-items: center; gap: 8px; font-size: 1.1rem;"><i class="ph ph-user-plus"></i> Agregar Nuevo Usuario</h3>
+            <form id="commander-register-form" style="display: flex; flex-direction: column; gap: 10px;">
                 <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 5px;">Este usuario tendrá permisos básicos para revisar inventario, no será administrador.</p>
                 <input type="text" id="cmd-reg-user" placeholder="Nombre de usuario o Placa" required style="padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit;">
                 <input type="text" id="cmd-reg-pass" placeholder="Contraseña" required style="padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit;">
