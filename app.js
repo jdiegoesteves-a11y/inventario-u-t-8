@@ -233,13 +233,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const div = document.createElement('div');
                     div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;';
                     div.innerHTML = `
-                        <div>
-                            <strong>${user.username}</strong><br>
-                            <span style="font-size: 0.8rem; color: #64748b;">Contraseña: ${user.password}</span>
-                        </div>
-                        <div style="display: flex; gap: 5px;">
-                            <button class="approve-btn" data-id="${user.id}" style="background: #10b981; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;"><i class="ph ph-check"></i> Aprobar</button>
-                            <button class="reject-btn" data-id="${user.id}" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;"><i class="ph ph-x"></i> Rechazar</button>
+                        <div class="inbox-item-wrapper" style="display: flex; width: 100%; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>${user.username}</strong><br>
+                                <span style="font-size: 0.8rem; color: #64748b;">Contraseña: ${user.password}</span>
+                            </div>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="approve-btn" data-id="${user.id}" style="background: #10b981; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;"><i class="ph ph-check"></i> Aprobar</button>
+                                <button class="reject-btn" data-id="${user.id}" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;"><i class="ph ph-x"></i> Rechazar</button>
+                            </div>
                         </div>
                     `;
                     inboxList.appendChild(div);
@@ -374,12 +376,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     deleteBtnHtml = `<button onclick="deleteHistoryEntry('${item.id}', '${entry.id}')" style="position: absolute; right: 10px; top: 10px; background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1.2rem;" title="Borrar registro"><i class="ph ph-trash"></i></button>`;
                 }
 
-                div.innerHTML = \`
-                    <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">\${entry.fecha}</div>
-                    <div style="margin-bottom: 4px;"><strong>\${entry.quien}</strong></div>
-                    <div style="font-size: 0.9rem;">\${entry.accion}</div>
-                    \${deleteBtnHtml}
-                \`;
+                div.innerHTML = `
+                    <div class="history-entry-item">
+                        <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">${entry.fecha}</div>
+                        <div style="margin-bottom: 4px;"><strong>${entry.quien}</strong></div>
+                        <div style="font-size: 0.9rem;">${entry.accion}</div>
+                        ${deleteBtnHtml}
+                    </div>
+                `;
                 historyList.appendChild(div);
             });
         }
@@ -413,7 +417,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         unsubscribe = onSnapshot(collection(db, currentCollection), (snapshot) => {
             console.log("Received inventory snapshot, size:", snapshot.size);
-            currentInventoryData = [];
+            currentInventoryData.length = 0; // Maintain reference for global access
             
             if (snapshot.empty) {
                 console.log(`Database ${currentCollection} is empty. Populating...`);
@@ -1594,5 +1598,7 @@ INSTRUCCIONES ABSOLUTAS:
             if (e.key === 'Enter') sendAi.click();
         });
     }
+
+    checkSession(); // Added to trigger auth check on load
 
 }); // End of DOMContentLoaded
