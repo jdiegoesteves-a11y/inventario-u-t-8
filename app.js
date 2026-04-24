@@ -49,9 +49,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const closeModal = document.querySelector('.close-modal');
 
     let currentInventoryData = [];
+    window.currentInventoryData = currentInventoryData; // Make it global for history deletion
     const searchInput = document.getElementById('search-input');
 
     tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Cargando inventario desde Firebase...</td></tr>';
+    console.log("DOM Loaded, starting auth check...");
 
     const authContainer = document.getElementById('auth-container');
     const appContainer = document.getElementById('app-container');
@@ -90,23 +92,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Check session
     const checkSession = () => {
         const session = localStorage.getItem('userSession');
+        console.log("Checking session:", session);
         if (session) {
-            const userData = JSON.parse(session);
-            inventariador = userData.username;
-            currentUserRole = userData.role;
-            authContainer.style.display = 'none';
-            appContainer.style.display = 'block';
-            
-            if (currentUserRole === 'commander') {
-                inboxBtn.style.display = 'flex';
-                listenForInbox();
-            } else {
-                inboxBtn.style.display = 'none';
+            try {
+                const userData = JSON.parse(session);
+                inventariador = userData.username;
+                currentUserRole = userData.role;
+                
+                if (authContainer) authContainer.style.setProperty('display', 'none', 'important');
+                if (appContainer) appContainer.style.setProperty('display', 'block', 'important');
+                
+                console.log("User logged in:", inventariador, currentUserRole);
+                
+                if (currentUserRole === 'commander') {
+                    if (inboxBtn) inboxBtn.style.display = 'flex';
+                    listenForInbox();
+                } else {
+                    if (inboxBtn) inboxBtn.style.display = 'none';
+                }
+                startRealtimeListener();
+            } catch (e) {
+                console.error("Session parse error:", e);
+                localStorage.removeItem('userSession');
             }
-            startRealtimeListener();
         } else {
-            authContainer.style.display = 'flex';
-            appContainer.style.display = 'none';
+            if (authContainer) authContainer.style.display = 'flex';
+            if (appContainer) appContainer.style.display = 'none';
         }
     };
 
@@ -125,6 +136,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         submitBtn.disabled = true;
 
         if (user === '17010' && pass === 'Adri135Emi135') {
+            console.log("Commander login success");
             localStorage.setItem('userSession', JSON.stringify({ username: 'Comandante', role: 'commander' }));
             checkSession();
         } else {
@@ -250,6 +262,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     });
                 });
             }
+        }, (error) => {
+            console.error("Inbox Snapshot Error:", error);
         });
     }
 
@@ -392,14 +406,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     let unsubscribe = null;
 
     function startRealtimeListener() {
+        console.log("Starting listener for:", currentCollection);
         if (unsubscribe) unsubscribe();
 
-        tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Conectando con la base de datos...</td></tr>';
+        if (typeof tableBody !== 'undefined') tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Conectando con la base de datos...</td></tr>';
 
         unsubscribe = onSnapshot(collection(db, currentCollection), (snapshot) => {
+            console.log("Received inventory snapshot, size:", snapshot.size);
+            currentInventoryData = [];
+            
             if (snapshot.empty) {
                 console.log(`Database ${currentCollection} is empty. Populating...`);
-                tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Inicializando base de datos por primera vez...</td></tr>';
+                if (typeof tableBody !== 'undefined') tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Inicializando base de datos por primera vez...</td></tr>';
                 const batch = writeBatch(db);
                 fullInventory.forEach((item) => {
                     const docRef = doc(db, currentCollection, item.codigo);
