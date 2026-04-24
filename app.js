@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
     const logoutBtn = document.getElementById('logout-btn');
+    const changeUnitBtn = document.getElementById('change-unit-btn');
     const inboxBtn = document.getElementById('inbox-btn');
     const inboxModal = document.getElementById('inbox-modal');
     const closeInboxModal = document.querySelector('.close-inbox-modal');
@@ -116,6 +117,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (selectU8) selectU8.addEventListener('click', () => selectUnit('U-8', 'inventory_u8'));
     if (selectT8) selectT8.addEventListener('click', () => selectUnit('T-8', 'inventory_t8'));
+
+    if (changeUnitBtn) {
+        changeUnitBtn.addEventListener('click', () => {
+            if (appContainer) appContainer.style.setProperty('display', 'none', 'important');
+            if (unitModal) unitModal.style.display = 'flex';
+        });
+    }
 
     // Check session
     const checkSession = () => {
