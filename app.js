@@ -636,10 +636,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         return;
                     }
                 } else {
-                    const pass = prompt("Para desmarcar, introduce la contraseña del comandante:");
-                    if (pass !== "Adri135Emi135") {
+                    if (!confirm("¿estás seguro de que quieres deshabilitar el check?")) {
                         e.target.checked = true;
-                        if (pass !== null) alert("Contraseña incorrecta.");
                         return;
                     }
                 }
