@@ -1,3 +1,4 @@
+// Last Update: 2026-04-24T03:26:50Z
 export const fullInventory = [
     { codigo: "14712", sicafi: "1000004", pf: "29577", descripcion: "ESCALERA", ubicacion: "I-258 - U-8", marca: "No Aplica", modelo: "", serie: "" },
     { codigo: "15036", sicafi: "1000912", pf: "29578", descripcion: "ESCALERA", ubicacion: "I-258 - U-8", marca: "No Aplica", modelo: "", serie: "" },
