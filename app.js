@@ -106,9 +106,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 if (currentUserRole === 'commander') {
                     if (inboxBtn) inboxBtn.style.display = 'flex';
+                    if (document.getElementById('create-user-btn')) document.getElementById('create-user-btn').style.display = 'flex';
                     listenForInbox();
                 } else {
                     if (inboxBtn) inboxBtn.style.display = 'none';
+                    if (document.getElementById('create-user-btn')) document.getElementById('create-user-btn').style.display = 'none';
                 }
                 startRealtimeListener();
             } catch (e) {
@@ -269,26 +271,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    const tabSolicitudes = document.getElementById('tab-solicitudes');
-    const tabCrearUsuario = document.getElementById('tab-crear-usuario');
-    const inboxSolicitudesView = document.getElementById('inbox-solicitudes-view');
-    const inboxCrearView = document.getElementById('inbox-crear-view');
+    const createUserBtn = document.getElementById('create-user-btn');
+    const createUserModal = document.getElementById('create-user-modal');
+    const closeCreateUserModal = document.querySelector('.close-create-user-modal');
     const commanderRegisterForm = document.getElementById('commander-register-form');
 
-    if(tabSolicitudes && tabCrearUsuario) {
-        tabSolicitudes.addEventListener('click', () => {
-            inboxSolicitudesView.style.display = 'block';
-            inboxCrearView.style.display = 'none';
-            tabSolicitudes.style.color = 'var(--accent)';
-            tabCrearUsuario.style.color = '#64748b';
-        });
-        tabCrearUsuario.addEventListener('click', () => {
-            inboxCrearView.style.display = 'block';
-            inboxSolicitudesView.style.display = 'none';
-            tabCrearUsuario.style.color = 'var(--accent)';
-            tabSolicitudes.style.color = '#64748b';
-        });
+    if (createUserBtn) createUserBtn.addEventListener('click', () => createUserModal.classList.remove('hidden'));
+    if (closeCreateUserModal) closeCreateUserModal.addEventListener('click', () => createUserModal.classList.add('hidden'));
+    if (createUserModal) createUserModal.addEventListener('click', (e) => { if (e.target === createUserModal) createUserModal.classList.add('hidden'); });
 
+    if (commanderRegisterForm) {
         commanderRegisterForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const user = document.getElementById('cmd-reg-user').value.trim();
@@ -312,14 +304,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                         status: 'approved',
                         createdAt: new Date().toISOString()
                     });
-                    alert("Usuario creado y aprobado exitosamente.");
+                    alert("Usuario común creado y aprobado exitosamente.");
                     commanderRegisterForm.reset();
+                    createUserModal.classList.add('hidden');
                 }
             } catch (error) {
                 console.error(error);
                 alert("Error al crear usuario.");
             }
-            submitBtn.innerHTML = 'Crear y Aprobar';
+            submitBtn.innerHTML = 'Crear Usuario';
             submitBtn.disabled = false;
         });
     }
