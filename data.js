@@ -19,7 +19,7 @@ export const inventoryU8 = [
     { codigo: "23665", sicafi: "1012167", pf: "29759", descripcion: "GANCHO CON MANGO DE 12 PIES", ubicacion: "I-258 - U-8", marca: "SAMDUNG", modelo: "S/M", serie: "S/S" },
     { codigo: "23668", sicafi: "1012170", pf: "29744", descripcion: "GANCHO CON MANGO DE 4 PIES Y AGARRADERA", ubicacion: "I-258 - U-8", marca: "AKRON", modelo: "S/M", serie: "S/S" },
     { codigo: "23669", sicafi: "1012171", pf: "29745", descripcion: "GANCHO CON MANGO DE 4 PIES Y AGARRADERA", ubicacion: "I-258 - U-8", marca: "AKRON", modelo: "S/M", serie: "S/S" },
-    { codigo: "25161", sicafi: "1013671", pf: "15336", descripcion: "RADIO SIRENA", ubicacion: "I-258 - U-8", marca: "CODE 3", modelo: "", serie: "" },
+    { codigo: "25161", sicafi: "1013671", pf: "15336", descripcion: "RADIO SIERENA", ubicacion: "I-258 - U-8", marca: "CODE 3", modelo: "", serie: "" },
     { codigo: "25708", sicafi: "1014213", pf: "29561", descripcion: "EQ/PROTEC.RESP.AUTON.+MASC+VALV+ENCHUFE MP", ubicacion: "I-258 - U-8", marca: "AIRBOX", modelo: "AERIS PRO TIPO 2", serie: "EQ114907-06-16" },
     { codigo: "25968", sicafi: "1014473", pf: "6650", descripcion: "EQ/PROTEC.RESP.AUTON.+MASC+VALV+ENCHUFE MP", ubicacion: "I-258 - U-8", marca: "AIRBOX", modelo: "AERIS PRO TIPO 2", serie: "EQ114765-06-16" },
     { codigo: "25970", sicafi: "1014475", pf: "6648", descripcion: "CILINDRO / EQ. RESP. AUTON. + VALVULA", ubicacion: "I-258 - U-8", marca: "AIRBOX", modelo: "COMPOSITE 6.9", serie: "FJM-38541" },
@@ -117,9 +117,9 @@ export const inventoryU8 = [
     { codigo: "57599", sicafi: "", pf: "29734", descripcion: "LINTERNA PORTATIL", ubicacion: "I-258 - U-8", marca: "NIGHTSTICK", modelo: "XPR-5580R", serie: "20407-3994" },
     { codigo: "58032", sicafi: "", pf: "29743", descripcion: "HERRAMIENTA PARA ENTRADA FORZOSA", ubicacion: "I-258 - U-8", marca: "No Aplica", modelo: "", serie: "" },
     { codigo: "62415", sicafi: "", pf: "29751", descripcion: "HALLIGAN", ubicacion: "I-258 - U-8", marca: "No Aplica", modelo: "", serie: "" },
-    { codigo: "66113", sicafi: "-", pf: "-", descripcion: "ARNES DE CUERPO ENTERO", ubicacion: "I-258 - U-8", marca: "ARMADURA", modelo: "", serie: "" },
-    { codigo: "69533", sicafi: "-", pf: "-", descripcion: "VENTILADOR A BATERÍA", ubicacion: "I-258 - U-8", marca: "BLOWHARD", modelo: "QUICKEE", serie: "Q1-Q1-356759" },
-    { codigo: "69543", sicafi: "-", pf: "-", descripcion: "DUCTO PARA VENTILADOR A BATERIA", ubicacion: "I-258 - U-8", marca: "No Aplica", modelo: "QUICKEE", serie: "S/S" }
+    { codigo: "66113", sicafi: "-", pf: "", descripcion: "ARNES DE CUERPO ENTERO", ubicacion: "I-258 - U-8", marca: "ARMADURA", modelo: "", serie: "" },
+    { codigo: "69533", sicafi: "-", pf: "", descripcion: "VENTILADOR A BATERÍA", ubicacion: "I-258 - U-8", marca: "BLOWHARD", modelo: "QUICKEE", serie: "Q1-Q1-356759" },
+    { codigo: "69543", sicafi: "-", pf: "", descripcion: "DUCTO PARA VENTILADOR A BATERIA", ubicacion: "I-258 - U-8", marca: "No Aplica", modelo: "QUICKEE", serie: "S/S" }
 ];
 
 export const inventoryT8 = [
