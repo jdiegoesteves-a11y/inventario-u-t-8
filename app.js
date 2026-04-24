@@ -14,15 +14,15 @@ import {
     arrayRemove
 } from "firebase/firestore";
 
-// Firebase configuration for 5ta Brigada
+// Firebase configuration for U-8 / T-8
 const firebaseConfig = {
-    apiKey: "AIzaSyBpGkDT1Fz-XqY_H7clwtHYiwyeCsWvrQk",
-    authDomain: "inventario-5ta-brigada.firebaseapp.com",
-    projectId: "inventario-5ta-brigada",
-    storageBucket: "inventario-5ta-brigada.firebasestorage.app",
-    messagingSenderId: "903523003246",
-    appId: "1:903523003246:web:bd4cbd336d7f01ac46ef7f",
-    measurementId: "G-LFWZTZFGRR"
+  apiKey: "AIzaSyD0YlGepgouMvXR61uDyozlsU-17ZSB6Sw",
+  authDomain: "inventario-u-t-8.firebaseapp.com",
+  projectId: "inventario-u-t-8",
+  storageBucket: "inventario-u-t-8.firebasestorage.app",
+  messagingSenderId: "952474876599",
+  appId: "1:952474876599:web:4938914b7f0ee42139eb32",
+  measurementId: "G-DDWWQH3TWV"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -37,8 +37,8 @@ const db = getFirestore(app);
 const IMGBB_API_KEY = "6f61e5ee8f8afa155a55c439b13602e5";
 
 let reviewedCount = 0;
-let currentUnit = "5ta Brigada";
-let currentCollection = "inventory";
+let currentUnit = "";
+let currentCollection = "";
 
 document.addEventListener('DOMContentLoaded', async () => {
     const tableBody = document.getElementById('inventory-body');
@@ -89,6 +89,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         tabLogin.style.borderBottom = 'none';
     });
 
+    // Unit selection logic
+    const unitModal = document.getElementById('unit-selection-modal');
+    const selectU8 = document.getElementById('select-u8');
+    const selectT8 = document.getElementById('select-t8');
+
+    function selectUnit(unitName, collectionName) {
+        currentUnit = unitName;
+        currentCollection = collectionName;
+        if (unitModal) unitModal.style.display = 'none';
+        if (appContainer) appContainer.style.setProperty('display', 'block', 'important');
+        const mainTitle = document.getElementById('main-title');
+        if (mainTitle) mainTitle.textContent = `INVENTARIO ${unitName}`;
+        
+        if (currentUserRole === 'commander') {
+            if (inboxBtn) inboxBtn.style.display = 'flex';
+            if (document.getElementById('manage-users-btn')) document.getElementById('manage-users-btn').style.display = 'flex';
+            listenForInbox();
+            if(typeof listenForUsersList === 'function') listenForUsersList();
+        } else {
+            if (inboxBtn) inboxBtn.style.display = 'none';
+            if (document.getElementById('manage-users-btn')) document.getElementById('manage-users-btn').style.display = 'none';
+        }
+        startRealtimeListener();
+    }
+
+    if (selectU8) selectU8.addEventListener('click', () => selectUnit('U-8', 'inventory_u8'));
+    if (selectT8) selectT8.addEventListener('click', () => selectUnit('T-8', 'inventory_t8'));
+
     // Check session
     const checkSession = () => {
         const session = localStorage.getItem('userSession');
@@ -100,20 +128,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentUserRole = userData.role;
                 
                 if (authContainer) authContainer.style.setProperty('display', 'none', 'important');
-                if (appContainer) appContainer.style.setProperty('display', 'block', 'important');
+                if (unitModal) unitModal.style.display = 'flex';
                 
                 console.log("User logged in:", inventariador, currentUserRole);
-                
-                if (currentUserRole === 'commander') {
-                    if (inboxBtn) inboxBtn.style.display = 'flex';
-                    if (document.getElementById('manage-users-btn')) document.getElementById('manage-users-btn').style.display = 'flex';
-                    listenForInbox();
-                    if(typeof listenForUsersList === 'function') listenForUsersList();
-                } else {
-                    if (inboxBtn) inboxBtn.style.display = 'none';
-                    if (document.getElementById('manage-users-btn')) document.getElementById('manage-users-btn').style.display = 'none';
-                }
-                startRealtimeListener();
             } catch (e) {
                 console.error("Session parse error:", e);
                 localStorage.removeItem('userSession');

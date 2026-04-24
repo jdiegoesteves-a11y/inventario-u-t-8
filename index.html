@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/jpeg" href="logo.jpeg">
-    <title>Inventario - 5ta Brigada</title>
+    <title>Inventario - U-8 / T-8</title>
     <link rel="stylesheet" href="styles.css">
     <!-- Google Fonts for modern typography -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -56,12 +56,24 @@
         </div>
     </div>
 
+    <!-- Unit Selection Modal -->
+    <div id="unit-selection-modal" style="display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px;">
+        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center;">
+            <img src="logo.jpeg" alt="Logo" style="width: 100px; margin-bottom: 20px; border-radius: 8px;">
+            <h2 style="margin-bottom: 20px;">¿Qué unidad vas a inventariar hoy?</h2>
+            <div style="display: flex; gap: 20px; justify-content: center;">
+                <button id="select-u8" style="flex: 1; padding: 15px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: background 0.2s;">U-8</button>
+                <button id="select-t8" style="flex: 1; padding: 15px; background: #ef4444; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: background 0.2s;">T-8</button>
+            </div>
+        </div>
+    </div>
+
     <div class="app-container" id="app-container" style="display: none;">
         <header class="header">
             <div class="header-content" style="display: flex; align-items: center; gap: 1.5rem;">
                 <img src="logo.jpeg" alt="Logo Bomberos" style="width: 70px; height: auto; border-radius: 8px;">
                 <div>
-                    <h1>INVENTARIO U30</h1>
+                    <h1 id="main-title">INVENTARIO</h1>
                     <p>Gestión y revisión de equipos</p>
                     <div style="margin-top: 5px; display: flex; gap: 10px;">
                         <button id="logout-btn" style="background: none; border: 1px solid #ef4444; color: #ef4444; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;"><i class="ph ph-sign-out"></i> Salir</button>
@@ -183,7 +195,7 @@
                     class="ph ph-x"></i></span>
             <h2 style="margin-bottom: 15px;">Añadir Nuevo Item</h2>
             <form id="add-item-form" style="display: flex; flex-direction: column; gap: 10px;">
-                <input type="text" id="add-codigo" placeholder="Código (Ej: U-30-001)" required
+                <input type="text" id="add-codigo" placeholder="Código (Ej: U-8-001)" required
                     style="padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
                 <input type="text" id="add-sicafi" placeholder="SICAFI"
                     style="padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
@@ -214,7 +226,7 @@
             <h2 style="margin-bottom: 15px;">Editar Item</h2>
             <form id="edit-item-form" style="display: flex; flex-direction: column; gap: 10px;">
                 <input type="hidden" id="edit-original-codigo">
-                <input type="text" id="edit-codigo" placeholder="Código (Ej: U-30-001)" required
+                <input type="text" id="edit-codigo" placeholder="Código (Ej: U-8-001)" required
                     style="padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; background-color: #f3f4f6;"
                     disabled title="El código no se puede editar">
                 <input type="text" id="edit-sicafi" placeholder="SICAFI"
