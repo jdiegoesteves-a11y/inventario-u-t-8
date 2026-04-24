@@ -1,4 +1,4 @@
-import { fullInventory } from './data.js?v=3';
+import { fullInventory } from './data.js?v=4';
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import {
