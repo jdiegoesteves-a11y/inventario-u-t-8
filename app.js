@@ -115,8 +115,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         startRealtimeListener();
     }
 
-    if (selectU8) selectU8.addEventListener('click', () => selectUnit('U-8', 'inventory_u8'));
-    if (selectT8) selectT8.addEventListener('click', () => selectUnit('T-8', 'inventory_t8'));
+    if (selectU8) selectU8.addEventListener('click', () => selectUnit('U-8', 'inventoryU8'));
+    if (selectT8) selectT8.addEventListener('click', () => selectUnit('T-8', 'inventoryT8'));
 
     if (changeUnitBtn) {
         changeUnitBtn.addEventListener('click', () => {
