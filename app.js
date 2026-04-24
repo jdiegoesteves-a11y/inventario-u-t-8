@@ -175,13 +175,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </select>
                 </td>
                 <td data-label="Fecha de Revisión">${item.ultimaRevision || '-'}</td>
+                <td data-label="Próxima Rev.">
+                    <input type="date" class="comment-input date-input-inline" id="next-rev-${item.id}" value="${item.proximaRevision || ''}" style="padding: 4px; font-size: 0.85rem; width: 130px;" ${item.revisado ? 'disabled' : ''} max="9999-12-31">
+                </td>
                 <td data-label="Revisión" class="action-column">
                     <div class="checkbox-wrapper">
                         <input type="checkbox" class="custom-checkbox" id="check-${item.id}" ${item.revisado ? 'checked' : ''}>
                     </div>
-                </td>
-                <td data-label="Próxima Rev.">
-                    <input type="date" class="comment-input date-input-inline" id="next-rev-${item.id}" value="${item.proximaRevision || ''}" style="padding: 4px; font-size: 0.85rem; width: 130px;" ${item.revisado ? 'disabled' : ''} max="9999-12-31">
                 </td>
                 <td data-label="Comentarios" class="action-column">
                     <textarea class="comment-input" id="comment-${item.id}" rows="1" placeholder="Agregar comentario..." ${item.revisado ? 'disabled' : ''}>${item.comentarios || ''}</textarea>
