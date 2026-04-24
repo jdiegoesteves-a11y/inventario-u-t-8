@@ -9,7 +9,9 @@ import {
     doc,
     setDoc,
     updateDoc,
-    writeBatch
+    writeBatch,
+    arrayUnion,
+    arrayRemove
 } from "firebase/firestore";
 
 // Firebase configuration for 5ta Brigada
@@ -251,9 +253,141 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    const tabSolicitudes = document.getElementById('tab-solicitudes');
+    const tabCrearUsuario = document.getElementById('tab-crear-usuario');
+    const inboxSolicitudesView = document.getElementById('inbox-solicitudes-view');
+    const inboxCrearView = document.getElementById('inbox-crear-view');
+    const commanderRegisterForm = document.getElementById('commander-register-form');
+
+    if(tabSolicitudes && tabCrearUsuario) {
+        tabSolicitudes.addEventListener('click', () => {
+            inboxSolicitudesView.style.display = 'block';
+            inboxCrearView.style.display = 'none';
+            tabSolicitudes.style.color = 'var(--accent)';
+            tabCrearUsuario.style.color = '#64748b';
+        });
+        tabCrearUsuario.addEventListener('click', () => {
+            inboxCrearView.style.display = 'block';
+            inboxSolicitudesView.style.display = 'none';
+            tabCrearUsuario.style.color = 'var(--accent)';
+            tabSolicitudes.style.color = '#64748b';
+        });
+
+        commanderRegisterForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const user = document.getElementById('cmd-reg-user').value.trim();
+            const pass = document.getElementById('cmd-reg-pass').value.trim();
+            const submitBtn = commanderRegisterForm.querySelector('button');
+            submitBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Creando...';
+            submitBtn.disabled = true;
+
+            try {
+                const userRef = doc(db, 'users', user);
+                const userSnap = await getDocs(collection(db, 'users'));
+                let exists = false;
+                userSnap.forEach(d => { if (d.id === user) exists = true; });
+                
+                if (exists) {
+                    alert("El usuario ya existe.");
+                } else {
+                    await setDoc(userRef, {
+                        username: user,
+                        password: pass,
+                        status: 'approved',
+                        createdAt: new Date().toISOString()
+                    });
+                    alert("Usuario creado y aprobado exitosamente.");
+                    commanderRegisterForm.reset();
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Error al crear usuario.");
+            }
+            submitBtn.innerHTML = 'Crear y Aprobar';
+            submitBtn.disabled = false;
+        });
+    }
+
     if (inboxBtn) inboxBtn.addEventListener('click', () => inboxModal.classList.remove('hidden'));
     if (closeInboxModal) closeInboxModal.addEventListener('click', () => inboxModal.classList.add('hidden'));
     if (inboxModal) inboxModal.addEventListener('click', (e) => { if (e.target === inboxModal) inboxModal.classList.add('hidden'); });
+
+    // History Modal Logic
+    const historyModal = document.getElementById('history-modal');
+    const closeHistoryModal = document.querySelector('.close-history-modal');
+    const historyList = document.getElementById('history-list');
+
+    if(historyModal) {
+        closeHistoryModal.addEventListener('click', () => historyModal.classList.add('hidden'));
+        historyModal.addEventListener('click', (e) => { if (e.target === historyModal) historyModal.classList.add('hidden'); });
+    }
+
+    window.deleteHistoryEntry = async function(itemId, entryId) {
+        if (!confirm('¿Seguro que deseas borrar este registro del historial?')) return;
+        const itemDoc = currentInventoryData.find(i => i.id === itemId);
+        if (!itemDoc) return;
+        const entryToRemove = itemDoc.historial.find(h => h.id === entryId);
+        if (!entryToRemove) return;
+
+        try {
+            await updateDoc(doc(db, currentCollection, itemId), {
+                historial: arrayRemove(entryToRemove)
+            });
+            // Re-open modal to refresh
+            const updatedItemDoc = currentInventoryData.find(i => i.id === itemId);
+            if(updatedItemDoc) {
+                 updatedItemDoc.historial = updatedItemDoc.historial.filter(h => h.id !== entryId);
+                 openHistoryModal(updatedItemDoc);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error al borrar historial");
+        }
+    }
+
+    function openHistoryModal(item) {
+        historyList.innerHTML = '';
+        if (!item.historial || item.historial.length === 0) {
+            historyList.innerHTML = '<p style="text-align: center; color: #64748b;">No hay historial para este ítem.</p>';
+        } else {
+            const sortedHistory = [...item.historial].sort((a, b) => b.id - a.id);
+            sortedHistory.forEach(entry => {
+                const div = document.createElement('div');
+                div.style.cssText = 'padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; position: relative;';
+                
+                let deleteBtnHtml = '';
+                if (currentUserRole === 'commander') {
+                    deleteBtnHtml = `<button onclick="deleteHistoryEntry('${item.id}', '${entry.id}')" style="position: absolute; right: 10px; top: 10px; background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1.2rem;" title="Borrar registro"><i class="ph ph-trash"></i></button>`;
+                }
+
+                div.innerHTML = \`
+                    <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">\${entry.fecha}</div>
+                    <div style="margin-bottom: 4px;"><strong>\${entry.quien}</strong></div>
+                    <div style="font-size: 0.9rem;">\${entry.accion}</div>
+                    \${deleteBtnHtml}
+                \`;
+                historyList.appendChild(div);
+            });
+        }
+        historyModal.classList.remove('hidden');
+    }
+
+    async function logHistory(itemId, accionDesc) {
+        if(!inventariador) return;
+        const entry = {
+            id: Date.now().toString(),
+            quien: inventariador,
+            accion: accionDesc,
+            fecha: new Date().toLocaleString('es-ES')
+        };
+        try {
+            await updateDoc(doc(db, currentCollection, itemId), {
+                historial: arrayUnion(entry)
+            });
+        } catch (e) {
+            console.error("Error logging history:", e);
+        }
+    }
 
     let unsubscribe = null;
 
@@ -384,6 +518,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td data-label="Comentarios" class="action-column">
                     <textarea class="comment-input" id="comment-${item.id}" rows="1" placeholder="Agregar comentario..." ${item.revisado ? 'disabled' : ''}>${item.comentarios || ''}</textarea>
                 </td>
+                <td data-label="Historial" class="action-column" style="text-align: center;">
+                    <button class="icon-btn history-item-btn" id="history-btn-${item.id}" title="Ver Historial" style="color: #64748b; background: none; border: none; cursor: pointer; font-size: 22px;"><i class="ph ph-clock-counter-clockwise"></i></button>
+                </td>
                 <td data-label="Acciones" class="action-column" style="display:flex; gap:15px; align-items:center; justify-content:center; padding-top:10px;">
                     <button class="icon-btn edit-item-btn" id="edit-${item.id}" title="Editar Item" style="color: ${item.revisado ? '#9ca3af' : '#3b82f6'}; background: none; border: none; cursor: ${item.revisado ? 'not-allowed' : 'pointer'}; font-size: 22px;" ${item.revisado ? 'disabled' : ''}><i class="ph ph-pencil-simple"></i></button>
                     <button class="icon-btn delete-item-btn" id="delete-item-${item.id}" title="Borrar Item" style="color: ${item.revisado ? '#9ca3af' : '#ef4444'}; background: none; border: none; cursor: ${item.revisado ? 'not-allowed' : 'pointer'}; font-size: 22px;" ${item.revisado ? 'disabled' : ''}><i class="ph ph-trash"></i></button>
@@ -454,6 +591,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 reviewedItemsEl.textContent = reviewedCount;
                 await updateDoc(doc(db, currentCollection, item.id), updateData);
+                await logHistory(item.id, isChecked ? 'Marcó como revisado' : 'Desmarcó la revisión');
             });
 
             // Comment
@@ -465,6 +603,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 clearTimeout(timeoutId);
                 timeoutId = setTimeout(async () => {
                     await updateDoc(doc(db, currentCollection, item.id), { comentarios: e.target.value });
+                    await logHistory(item.id, `Actualizó comentario: "${e.target.value}"`);
                 }, 1000);
             });
 
@@ -481,6 +620,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             statusSelect.addEventListener('change', async (e) => {
                 updateSelectColor(e.target.value);
                 await updateDoc(doc(db, currentCollection, item.id), { estado: e.target.value });
+                await logHistory(item.id, `Cambió estado a: ${e.target.value}`);
             });
 
             // Inline Proxima Revision
@@ -498,6 +638,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             nextRevInput.addEventListener('blur', async (e) => {
                 if (item.proximaRevision !== e.target.value) {
                     await updateDoc(doc(db, currentCollection, item.id), { proximaRevision: e.target.value });
+                    await logHistory(item.id, `Actualizó próxima revisión a: ${e.target.value}`);
                 }
             });
 
@@ -518,6 +659,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         console.error(err);
                         alert("Error al eliminar item");
                     }
+                });
+            }
+
+            // View History
+            const historyBtn = tr.querySelector(`#history-btn-${item.id}`);
+            if (historyBtn) {
+                historyBtn.addEventListener('click', () => {
+                    openHistoryModal(item);
                 });
             }
 
@@ -746,6 +895,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             try {
                 await updateDoc(doc(db, currentCollection, originalCodigo), updatedItem);
+                await logHistory(originalCodigo, 'Editó el ítem desde el panel de edición');
                 alert('Item actualizado correctamente. La página se recargará.');
                 window.location.reload();
             } catch (error) {
@@ -1310,7 +1460,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     : "Sin contexto de búsqueda activo.");
                 const intentContext    = Object.entries(INTENTS).filter(([,v]) => v).map(([k]) => k).join(', ') || 'conversación general';
 
-                const systemPrompt = `Eres "Cerebro Logístico 5ta Brigada", una IA avanzada de inventario para Bomberos.
+                const systemPrompt = `Eres "Búsqueda inteligente mediante IA", una IA avanzada de inventario para Bomberos.
 INVENTARIO: ${inventorySummary}
 DATOS ACTUALES: ${dataContext}
 INTENCIÓN DEL USUARIO: ${intentContext}

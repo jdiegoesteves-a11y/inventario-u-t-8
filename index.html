@@ -120,7 +120,7 @@
                 <div style="background: var(--accent); color: white; padding: 12px 20px; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <i class="ph ph-robot" style="font-size: 1.3rem;"></i>
-                        Cerebro Logístico 5ta Brigada
+                        Búsqueda inteligente mediante IA
                     </div>
                 </div>
                 
@@ -155,6 +155,7 @@
                             <th>Próxima Rev.</th>
                             <th class="action-column">Revisión</th>
                             <th class="action-column">Comentarios</th>
+                            <th class="action-column" style="width: 100px; text-align: center;">Historial</th>
                             <th class="action-column" style="width: 60px;">Acciones</th>
                         </tr>
                     </thead>
@@ -273,11 +274,39 @@
 
     <!-- Inbox Modal -->
     <div id="inbox-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 500px; padding: 20px;">
+        <div class="modal-content" style="max-width: 600px; padding: 20px;">
             <span class="close-inbox-modal" style="float: right; cursor: pointer; font-size: 20px;"><i class="ph ph-x"></i></span>
-            <h2 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="ph ph-tray"></i> Buzón de Solicitudes</h2>
-            <div id="inbox-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto;">
-                <p style="text-align: center; color: #64748b;">No hay solicitudes pendientes.</p>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;">
+                <button id="tab-solicitudes" style="background: none; border: none; font-weight: bold; color: var(--accent); cursor: pointer;">Solicitudes</button>
+                <button id="tab-crear-usuario" style="background: none; border: none; font-weight: bold; color: #64748b; cursor: pointer;">Crear Usuario</button>
+            </div>
+
+            <div id="inbox-solicitudes-view">
+                <h2 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="ph ph-tray"></i> Buzón de Solicitudes</h2>
+                <div id="inbox-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto;">
+                    <p style="text-align: center; color: #64748b;">No hay solicitudes pendientes.</p>
+                </div>
+            </div>
+
+            <div id="inbox-crear-view" style="display: none;">
+                <h2 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="ph ph-user-plus"></i> Registrar Usuario</h2>
+                <form id="commander-register-form" style="display: flex; flex-direction: column; gap: 15px;">
+                    <input type="text" id="cmd-reg-user" placeholder="Nombre de usuario" required style="padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit;">
+                    <input type="text" id="cmd-reg-pass" placeholder="Contraseña" required style="padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit;">
+                    <button type="submit" style="padding: 10px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Crear y Aprobar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="history-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px; padding: 20px;">
+            <span class="close-history-modal" style="float: right; cursor: pointer; font-size: 20px;"><i class="ph ph-x"></i></span>
+            <h2 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="ph ph-clock-counter-clockwise"></i> Historial de Cambios</h2>
+            <div id="history-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto;">
+                <!-- History items here -->
             </div>
         </div>
     </div>
