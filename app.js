@@ -1,5 +1,5 @@
-import { inventoryU8, inventoryT8 } from './data.js?v=20';
-console.log("INVENTARIO APP V20 LOADED - FILENAME FIX ACTIVE");
+import { inventoryC31 as fullInventory } from './data.js?v=31';
+console.log("INVENTARIO APP C-31 LOADED");
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import {
@@ -15,15 +15,15 @@ import {
     arrayRemove
 } from "firebase/firestore";
 
-// Firebase configuration for U-8 / T-8
+// Firebase configuration for C-31
 const firebaseConfig = {
-  apiKey: "AIzaSyD0YlGepgouMvXR61uDyozlsU-17ZSB6Sw",
-  authDomain: "inventario-u-t-8.firebaseapp.com",
-  projectId: "inventario-u-t-8",
-  storageBucket: "inventario-u-t-8.firebasestorage.app",
-  messagingSenderId: "952474876599",
-  appId: "1:952474876599:web:4938914b7f0ee42139eb32",
-  measurementId: "G-DDWWQH3TWV"
+  apiKey: "AIzaSyDSY7yRDNaEQGOY6wevTUrlaMpUfmom4Gk",
+  authDomain: "c-31-bde26.firebaseapp.com",
+  projectId: "c-31-bde26",
+  storageBucket: "c-31-bde26.firebasestorage.app",
+  messagingSenderId: "41024680967",
+  appId: "1:41024680967:web:a0370dfb62e9d53167a6a2",
+  measurementId: "G-T9XGE2VL6M"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -38,8 +38,8 @@ const db = getFirestore(app);
 const IMGBB_API_KEY = "6f61e5ee8f8afa155a55c439b13602e5";
 
 let reviewedCount = 0;
-let currentUnit = "";
-let currentCollection = "";
+let currentUnit = "C-31";
+let currentCollection = "inventario_c31";
 
 document.addEventListener('DOMContentLoaded', async () => {
     const tableBody = document.getElementById('inventory-body');
@@ -91,15 +91,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         tabLogin.style.borderBottom = 'none';
     });
 
-    // Unit selection logic
-    const unitModal = document.getElementById('unit-selection-modal');
-    const selectU8 = document.getElementById('select-u8');
-    const selectT8 = document.getElementById('select-t8');
-
+    // Unit selection logic removed as there is only one unit now.
     function selectUnit(unitName, collectionName) {
         currentUnit = unitName;
         currentCollection = collectionName;
-        if (unitModal) unitModal.style.display = 'none';
         if (appContainer) appContainer.style.setProperty('display', 'block', 'important');
         const mainTitle = document.getElementById('main-title');
         if (mainTitle) mainTitle.textContent = `INVENTARIO ${unitName}`;
@@ -116,16 +111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         startRealtimeListener();
     }
 
-    if (selectU8) selectU8.addEventListener('click', () => selectUnit('U-8', 'inventario_u8'));
-    if (selectT8) selectT8.addEventListener('click', () => selectUnit('T-8', 'inventario_t8'));
-
-    if (changeUnitBtn) {
-        changeUnitBtn.addEventListener('click', () => {
-            if (appContainer) appContainer.style.setProperty('display', 'none', 'important');
-            if (unitModal) unitModal.style.display = 'flex';
-        });
-    }
-
     // Check session
     const checkSession = () => {
         const session = localStorage.getItem('userSession');
@@ -137,7 +122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentUserRole = userData.role;
                 
                 if (authContainer) authContainer.style.setProperty('display', 'none', 'important');
-                if (unitModal) unitModal.style.display = 'flex';
+                selectUnit('C-31', 'inventario_c31');
                 
                 console.log("User logged in:", inventariador, currentUserRole);
             } catch (e) {
@@ -495,7 +480,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log(`Database ${currentCollection} is empty. Populating...`);
                 if (typeof tableBody !== 'undefined') tableBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">Inicializando base de datos por primera vez...</td></tr>';
                 const batch = writeBatch(db);
-                const dataToUpload = currentUnit === 'U-8' ? inventoryU8 : inventoryT8;
+                const dataToUpload = fullInventory;
                 dataToUpload.forEach((item) => {
                     const docRef = doc(db, currentCollection, item.codigo);
                     batch.set(docRef, { ...item, estado: "", revisado: false, comentarios: "", fotoUrl: "" });
