@@ -1,4 +1,5 @@
-import { inventoryU8, inventoryT8 } from './data.js?v=5';
+import { inventoryU8, inventoryT8 } from './data.js?v=20';
+console.log("INVENTARIO APP V20 LOADED - FILENAME FIX ACTIVE");
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import {
@@ -163,7 +164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         submitBtn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Ingresando...';
         submitBtn.disabled = true;
 
-        if (user === '17010' && pass === 'Adri135Emi135') {
+        if (user === 'administrador' && pass === '12345') {
             console.log("Commander login success");
             localStorage.setItem('userSession', JSON.stringify({ username: 'Comandante', role: 'commander' }));
             checkSession();
@@ -1095,7 +1096,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
 
-                pdfDoc.save('inventario_5ta_brigada.pdf');
+                pdfDoc.save(`inventario_${currentUnit}.pdf`);
             } catch (err) {
                 console.error("Error generating PDF:", err);
                 alert('Error al generar PDF');
@@ -1139,7 +1140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const worksheet = XLSX.utils.json_to_sheet(excelData);
                 const workbook = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
-                XLSX.writeFile(workbook, "inventario_5ta_brigada.xlsx");
+                XLSX.writeFile(workbook, `inventario_${currentUnit}.xlsx`);
             } catch (err) {
                 console.error("Error generating Excel:", err);
                 alert('Error al generar Excel');
@@ -1214,7 +1215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 styles: { fontSize: 7.5, valign: 'middle', halign: 'left', overflow: 'linebreak' },
                 headStyles: { fillColor: [99, 102, 241], halign: 'center', fontSize: 7.5, fontStyle: 'bold' }
             });
-            pdfDoc.save(`inventario_${titulo.replace(/\s+/g, '_')}.pdf`);
+            pdfDoc.save(`inventario_${currentUnit}_${titulo.replace(/\s+/g, '_')}.pdf`);
             addMessage(`✅ ¡PDF listo! Se han descargado <strong>${items.length}</strong> ítems de "${titulo}". 📄`, 'assistant');
         }
 
@@ -1235,7 +1236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const worksheet = XLSX.utils.json_to_sheet(excelData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Filtrado");
-            XLSX.writeFile(workbook, `inventario_${titulo.replace(/\s+/g, '_')}.xlsx`);
+            XLSX.writeFile(workbook, `inventario_${currentUnit}_${titulo.replace(/\s+/g, '_')}.xlsx`);
             addMessage(`✅ ¡Excel listo!`, 'assistant');
         }
 
